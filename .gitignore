@@ -1,0 +1,13 @@
+# configuração local (pode ter passwords)
+.env
+
+# estado e presets locais da UI
+data/*
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+
+# pacotes
+*.tar.gz

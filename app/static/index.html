@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT2IEP TX Audio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%23f2a541%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="call">CT2IEP</span> <span class="sub">TX Audio</span></div>
+  <div class="status"><span id="dot" class="dot"></span><span id="statusText">a ligar…</span></div>
+  <nav>
+    <button class="tab active" data-tab="chain">Cadeia</button>
+    <button class="tab" data-tab="mixer">Placa</button>
+  </nav>
+</header>
+
+<main>
+  <section id="tab-chain">
+    <div class="toolbar">
+      <button id="abBtn" class="ab" title="Desliga todos os blocos para comparar">A/B · Bypass total</button>
+      <div class="presets">
+        <select id="presetSel"><option value="">— preset —</option></select>
+        <button id="presetLoad">Carregar</button>
+        <button id="presetSave">Guardar como…</button>
+        <button id="presetDel" class="ghost">Apagar</button>
+      </div>
+    </div>
+
+    <div id="meters" class="meters"></div>
+
+    <div id="strip" class="strip"></div>
+
+    <div id="panel" class="panel"></div>
+  </section>
+
+  <section id="tab-mixer" hidden>
+    <div class="toolbar">
+      <div><strong>Mixer ALSA</strong> <span id="mixerCard" class="muted"></span></div>
+      <button id="mixerRefresh">Atualizar</button>
+    </div>
+    <div id="mixer" class="mixer"></div>
+    <details class="cards"><summary>Placas detetadas</summary><pre id="cards"></pre></details>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+# Cadeia de processamento TX (equivalente à cadeia do Waveform).
+# Ordem = ordem do sinal. Edita e reinicia o serviço web:  docker compose restart web
+#
+# Valores dos parâmetros estão nas unidades do plugin.
+# Para ganhos podes escrever em dB (ex.: "-40dB"): é convertido para coeficiente linear.
+# "main" = parâmetros mostrados logo na UI; os restantes ficam em "Avançado".
+# "bypass: true" = bloco carregado mas desligado (ativa-se na UI).
+# meters: kind "level" (nível, -60..0 dB) ou "gr" (redução de ganho).
+
+io:
+  # entrada do microfone (canal 1 da placa principal)
+  inputs: ["system:capture_1"]
+  # saídas: placa principal (L+R). Para o USB do FTDX usa
+  #   ["ftdx_out:playback_1", "ftdx_out:playback_2"]   (e FTDX_CARD no .env)
+  outputs: ["system:playback_1", "system:playback_2"]
+
+blocks:
+  - id: gate
+    name: Gate
+    replaces: Waves C1 gate
+    uri: http://lsp-plug.in/plugins/lv2/gate_mono
+    main: [gt, gr, at, rt, gh, ht]
+    params: { gt: "-50dB", gr: "-24dB", at: 2, rt: 250, gh: 1, ht: "-56dB" }
+    meters:
+      - { symbol: ilm, label: "Entrada" }
+      - { symbol: rlm, label: "Gate", kind: gr }
+
+  - id: bass
+    name: Bass Enhancer
+    replaces: Waves RBass
+    uri: http://calf.sourceforge.net/plugins/BassEnhancer
+    bypass: true          # em SSB os graves são cortados; liga só se quiseres "corpo"
+    main: [amount, drive, freq, level_out]
+    params: { amount: 0.5, drive: 4, freq: 180 }
+
+  - id: eq
+    name: EQ paramétrico
+    replaces: PuigTec MEQ5 + F6 + OneKnob Brighter
+    uri: http://lsp-plug.in/plugins/lv2/para_equalizer_x8_mono
+    # banda 0: passa-altos 120 Hz | 1: corte de "lama" 300 Hz | 2: presença 1,8 kHz
+    # banda 3: brilho (hi-shelf) 2,4 kHz
+    main: [ft_0, f_0, ft_1, f_1, g_1, ft_2, f_2, g_2, w_2, ft_3, f_3, g_3, g_out]
+    params:
+      ft_0: 2   # Hi-pass
+      f_0: 120
+      s_0: 3    # x4 (24 dB/oct)
+      ft_1: 1   # Bell
+      f_1: 300
+      g_1: "-3dB"
+      w_1: 1.5
+      ft_2: 1   # Bell
+      f_2: 1800
+      g_2: "3dB"
+      w_2: 2
+      ft_3: 3   # Hi-shelf
+      f_3: 2400
+      g_3: "2dB"
+
+  - id: comp
+    name: Compressor
+    replaces: GW ToneCentric (dinâmica)
+    uri: http://lsp-plug.in/plugins/lv2/compressor_mono
+    main: [al, cr, kn, at, rt, mk]
+    params: { al: "-24dB", cr: 4, kn: "-6dB", at: 8, rt: 120, mk: "8dB" }
+    meters:
+      - { symbol: rlm, label: "Comp", kind: gr }
+
+  - id: sat
+    name: Saturação
+    replaces: GW ToneCentric (cor)
+    uri: http://calf.sourceforge.net/plugins/Saturator
+    bypass: true
+    main: [drive, blend, mix, level_out]
+    params: { drive: 1.5, blend: 0, mix: 0.4 }
+
+  - id: exciter
+    name: Exciter
+    replaces: La Petite Excite
+    uri: http://calf.sourceforge.net/plugins/Exciter
+    main: [amount, drive, freq, blend]
+    params: { amount: 1, drive: 6, freq: 2000 }
+
+  - id: deesser
+    name: De-esser
+    replaces: Waves DeEsser
+    uri: http://calf.sourceforge.net/plugins/Deesser
+    main: [threshold, ratio, f1_freq, f2_freq, f2_level, makeup]
+    params: { threshold: "-18dB", ratio: 3, f1_freq: 2500, f2_freq: 2700, f2_level: 4 }
+    meters:
+      - { symbol: compression, label: "De-ess", kind: gr }
+
+  - id: reverb
+    name: Plate Reverb
+    replaces: Abbey Road Plates
+    uri: urn:dragonfly:plate
+    bypass: true          # reverb em TX costuma prejudicar a inteligibilidade
+    main: [dry_level, early_level, decay, predelay]
+    params: { dry_level: 100, early_level: 8, decay: 0.4 }
+
+  - id: lpf
+    name: Passa-baixos (largura de banda)
+    replaces: limite de banda SSB
+    uri: http://lsp-plug.in/plugins/lv2/filter_mono
+    main: [ft, f, s]
+    params: { ft: 0, f: 2900, s: 3 }   # Lo-pass 2,9 kHz, x4
+
+  - id: limiter
+    name: Limiter
+    replaces: Waves L1
+    uri: http://lsp-plug.in/plugins/lv2/limiter_mono
+    # brickwall a -3 dBFS; lookahead 2 ms (latência baixa); sem oversampling
+    main: [g_in, th, lk, rt, g_out]
+    params: { g_in: "0dB", th: "-3dB", boost: 0, alr: 0, mode: 0, lk: 2, at: 2, rt: 10, ovs: 0 }
+    meters:
+      - { symbol: grlm, label: "Limiter", kind: gr }
+      - { symbol: olm, label: "Saída" }

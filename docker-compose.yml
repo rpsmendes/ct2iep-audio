@@ -1,0 +1,50 @@
+name: ct2iep-audio
+
+x-image: &image
+  image: ct2iep-audio:latest
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+
+services:
+  engine:
+    <<: *image
+    container_name: audio-engine
+    command: ["/usr/local/bin/engine.sh"]
+    env_file: .env
+    restart: unless-stopped
+    devices:
+      - /dev/snd:/dev/snd
+    group_add:
+      - audio
+    cap_add:
+      - SYS_NICE          # prioridade em tempo real para o jackd
+    ulimits:
+      rtprio: 95
+      memlock: -1
+    shm_size: 256m
+    expose:
+      - "5555"            # comandos mod-host (só na rede interna do compose)
+      - "5556"            # feedback (meters)
+
+  web:
+    <<: *image
+    container_name: audio-web
+    command: ["python3", "/app/server.py"]
+    env_file: .env
+    environment:
+      MODHOST_HOST: engine
+      CHAIN_FILE: /config/chain.yaml
+      DATA_DIR: /data
+    restart: unless-stopped
+    depends_on:
+      - engine
+    devices:
+      - /dev/snd:/dev/snd # para o mixer ALSA (ganhos da placa)
+    group_add:
+      - audio
+    volumes:
+      - ./config:/config:ro
+      - ./data:/data
+    ports:
+      - "${WEB_PORT:-8080}:8080"
