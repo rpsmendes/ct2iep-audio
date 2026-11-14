@@ -23,7 +23,7 @@ SR = 48000
 N = 32768                     # ~0.7 s: covers the latency of the LSP FIR/FFT modes
 POINTS = np.geomspace(20, 20000, 240)
 _cache = OrderedDict()
-BROKEN = set()                # plugins that crashed lv2apply (do not retry)
+BROKEN = set()                # plugins lv2apply cannot run (do not retry)
 _sem = asyncio.Semaphore(1)
 
 
@@ -108,7 +108,9 @@ async def measure(uri: str, params: dict, channels: int = 1, bundle: str = "") -
             p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.DEVNULL,
                                                      stderr=asyncio.subprocess.PIPE, env=env)
             _, err = await asyncio.wait_for(p.communicate(), 15)
-            if p.returncode < 0 or p.returncode >= 128:
+            if p.returncode != 0:
+                # crash, or a feature lv2apply does not provide (e.g. options):
+                # stop showing a graph for this plugin
                 BROKEN.add(uri)
             if p.returncode != 0 or not os.path.exists(dst):
                 raise RuntimeError("lv2apply failed: " + err.decode(errors="replace").strip()[-300:])
