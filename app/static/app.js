@@ -21,7 +21,7 @@ function toast(msg, ms = 2500) {
 async function api(method, url, body) {
   const r = await fetch(url, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
   let j = {}; try { j = await r.json(); } catch (_) { /* sem corpo */ }
-  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  if (!r.ok) { const e = new Error(j.error || `HTTP ${r.status}`); e.data = j; throw e; }
   return j;
 }
 

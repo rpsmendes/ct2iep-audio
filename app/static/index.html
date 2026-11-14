@@ -13,6 +13,7 @@
   <div class="status"><span id="dot" class="dot"></span><span id="statusText">a ligar…</span></div>
   <nav>
     <button class="tab active" data-tab="chain">Cadeia</button>
+    <button class="tab" data-tab="plugins">Plugins</button>
     <button class="tab" data-tab="mixer">Placa</button>
   </nav>
 </header>
@@ -38,6 +39,25 @@
     <div id="panel" class="panel"></div>
   </section>
 
+  <section id="tab-plugins" hidden>
+    <div class="toolbar">
+      <div><strong>Pacotes de plugins</strong> <span id="libCount" class="muted"></span></div>
+      <button id="pkgRefresh">Atualizar</button>
+    </div>
+    <p class="note warn">Instalar ou remover um pacote reinicia o motor de áudio (cerca de 2 s sem áudio).
+      Não o faças durante uma emissão. Os plugins instalados aqui ficam em <code>data/lv2</code> e
+      sobrevivem a atualizações da imagem. Para os usar, carrega no <strong>+</strong> no fim da cadeia.</p>
+    <div id="packages" class="packages"></div>
+    <div class="custom-pkg">
+      <label for="customPkg">Outro pacote Debian com plugins LV2</label>
+      <div class="row">
+        <input id="customPkg" type="text" placeholder="ex.: guitarix-lv2" autocomplete="off" spellcheck="false">
+        <button id="customInstall">Instalar</button>
+      </div>
+    </div>
+    <details id="pkgLogBox" class="cards" hidden><summary>Registo da última operação</summary><pre id="pkgLog"></pre></details>
+  </section>
+
   <section id="tab-mixer" hidden>
     <div class="toolbar">
       <div><strong>Mixer ALSA</strong> <span id="mixerCard" class="muted"></span></div>
@@ -48,9 +68,27 @@
   </section>
 </main>
 
+<!-- Biblioteca de plugins (adicionar bloco) -->
+<div id="libModal" class="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="libTitle">
+    <div class="modal-head">
+      <h2 id="libTitle">Adicionar plugin à cadeia</h2>
+      <button id="libClose" class="ghost" aria-label="Fechar">✕</button>
+    </div>
+    <div class="lib-filters">
+      <input id="libSearch" type="search" placeholder="Procurar (nome, autor, tipo)…" autocomplete="off">
+      <select id="libClass" aria-label="Tipo"><option value="">Todos os tipos</option></select>
+    </div>
+    <p id="libWhere" class="muted small"></p>
+    <p class="muted small">A cadeia é mono: nos plugins estéreo entra o mesmo sinal nos dois canais e segue só o canal esquerdo. Entradas de sidechain ficam desligadas.</p>
+    <div id="libList" class="lib-list"></div>
+  </div>
+</div>
+
 <div id="toast" class="toast" hidden></div>
 <script src="/static/app.js"></script>
 <script src="/static/chain-edit.js"></script>
 <script src="/static/graph.js"></script>
+<script src="/static/plugins.js"></script>
 </body>
 </html>
