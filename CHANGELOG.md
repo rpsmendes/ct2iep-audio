@@ -13,6 +13,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   retries (card unplugged) by itself, with its state shown in the UI. Stored in
   `data/engine/outputs.txt`. Requires `docker compose up -d` (new volume for
   the engine).
+- **Plugin browser with pages**: the **+** dialog and a new *Installed plugins*
+  section in the Plugins tab list every LV2 plugin with search, type and source
+  filters (in the image / installed from the UI) and pages of 20/50/100.
 
 ### Changed
 - **A/B and block bypass now really switch plugins off.** mod-host's own

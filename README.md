@@ -144,8 +144,9 @@ the radio. Use a foot switch on the rear PTT socket, VOX, or PTT over CAT/USB
   or use **◀ ▶** in the block panel. Only the JACK connections that change are
   redone (a few milliseconds of silence).
 - **Add / remove**: **+** at the end of the strip opens the library of all
-  installed LV2 plugins (search by name, author or type); the plugin is inserted
-  after the selected block. **Remove** in the panel takes the block out of the
+  installed LV2 plugins (search by name, author, type or package, filter by
+  type and source, browse page by page); the plugin is inserted after the
+  selected block. The same browser is in the Plugins tab. **Remove** in the panel takes the block out of the
   chain. The chain is mono: stereo plugins get the same signal on both inputs
   and only the left output continues; sidechain inputs are left unconnected.
 - **A/B · Bypass all**: takes every plugin out (unloaded, no CPU use) and

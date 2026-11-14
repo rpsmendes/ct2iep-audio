@@ -224,3 +224,11 @@ code { font-family: var(--mono); font-size: 12px; }
 .out-row input { width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
 .out-info { flex: 1; min-width: 0; }
 .out-name { font-weight: 600; }
+.lib-info-row { margin: 4px 2px; min-height: 16px; }
+.pager { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--line); }
+.pager:empty { display: none; }
+.pager button { min-width: 34px; }
+.lib-browser { display: flex; flex-direction: column; min-height: 0; }
+.modal-box .lib-browser { flex: 1; }
+.lib-browser.in-tab .lib-list { max-height: none; overflow: visible; }
+.modal-box .lib-list { flex: 1; min-height: 120px; }

@@ -46,7 +46,8 @@
     </div>
     <p class="note warn">Installing or removing a package restarts the audio engine (about 2 s without audio).
       Do not do it while transmitting. Plugins installed here live in <code>data/lv2</code> and
-      survive image updates. To use them, press <strong>+</strong> at the end of the chain.</p>
+      survive image updates. To use them, press <strong>+</strong> at the end of the chain or use the
+      list of installed plugins below.</p>
     <div id="packages" class="packages"></div>
     <div class="custom-pkg">
       <label for="customPkg">Another Debian package with LV2 plugins</label>
@@ -56,6 +57,11 @@
       </div>
     </div>
     <details id="pkgLogBox" class="cards" hidden><summary>Log of the last operation</summary><pre id="pkgLog"></pre></details>
+
+    <h3 class="section-title">Installed plugins</h3>
+    <p class="muted small">Every LV2 plugin the engine can load. <strong>Add</strong> inserts it in the chain after the selected block
+      (select a block in the Chain tab first; you can drag it elsewhere afterwards).</p>
+    <div id="pluginBrowser" class="lib-browser in-tab"></div>
   </section>
 
   <section id="tab-card" hidden>
@@ -88,13 +94,9 @@
       <h2 id="libTitle">Add a plugin to the chain</h2>
       <button id="libClose" class="ghost" aria-label="Close">✕</button>
     </div>
-    <div class="lib-filters">
-      <input id="libSearch" type="search" placeholder="Search (name, author, type)…" autocomplete="off">
-      <select id="libClass" aria-label="Type"><option value="">All types</option></select>
-    </div>
     <p id="libWhere" class="muted small"></p>
     <p class="muted small">The chain is mono: stereo plugins get the same signal on both inputs and only the left output continues. Sidechain inputs are left unconnected.</p>
-    <div id="libList" class="lib-list"></div>
+    <div id="libBrowser" class="lib-browser"></div>
   </div>
 </div>
 
