@@ -37,21 +37,25 @@ blocks:
     name: EQ paramétrico
     replaces: PuigTec MEQ5 + F6 + OneKnob Brighter
     uri: http://lsp-plug.in/plugins/lv2/para_equalizer_x8_mono
-    # banda 0: passa-altos 120 Hz | 1: corte de "lama" 300 Hz | 2: presença 1,8 kHz
+    # banda 0: passa-altos 120 Hz (Butterworth, -3 dB aos 120 Hz)
+    # banda 1: corte de "lama" 300 Hz | banda 2: presença 1,8 kHz
     # banda 3: brilho (hi-shelf) 2,4 kHz
-    main: [ft_0, f_0, ft_1, f_1, g_1, ft_2, f_2, g_2, w_2, ft_3, f_3, g_3, g_out]
+    # Nota: no LSP o "q" define a largura dos Bell (q=0 = larguíssimo);
+    # o "Filter Width" (w_N) não afeta os Bell.
+    main: [ft_0, f_0, s_0, ft_1, f_1, g_1, q_1, ft_2, f_2, g_2, q_2, ft_3, f_3, g_3, g_out]
     params:
       ft_0: 2   # Hi-pass
+      fm_0: 2   # BWC (BT) = Butterworth
       f_0: 120
-      s_0: 3    # x4 (24 dB/oct)
+      s_0: 1    # x2 (24 dB/oitava)
       ft_1: 1   # Bell
       f_1: 300
       g_1: "-3dB"
-      w_1: 1.5
+      q_1: 1
       ft_2: 1   # Bell
       f_2: 1800
       g_2: "3dB"
-      w_2: 2
+      q_2: 1
       ft_3: 3   # Hi-shelf
       f_3: 2400
       g_3: "2dB"
@@ -101,8 +105,9 @@ blocks:
     name: Passa-baixos (largura de banda)
     replaces: limite de banda SSB
     uri: http://lsp-plug.in/plugins/lv2/filter_mono
-    main: [ft, f, s]
-    params: { ft: 0, f: 2900, s: 3 }   # Lo-pass 2,9 kHz, x4
+    main: [ft, fm, f, s]
+    # Lo-pass Butterworth x4: -0,4 dB aos 2,5 kHz, -3 dB aos 2,9 kHz, -14 dB aos 3,5 kHz
+    params: { ft: 0, fm: 2, f: 2900, s: 3 }
 
   - id: limiter
     name: Limiter
