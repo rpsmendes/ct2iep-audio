@@ -371,43 +371,6 @@ $("#factoryReset")?.addEventListener("click", async () => {
   try { await api("POST", "/api/reset"); toast("Cadeia de fábrica reposta"); } catch (e) { toast(e.message); }
 });
 
-// ---------- mixer (separador Placa) ----------
-async function loadMixer() {
-  const r = await (await fetch("/api/mixer")).json();
-  $("#mixerCard").textContent = r.card ? `placa: ${r.card}` : "(define MIXER_CARD ou AUDIO_CARD)";
-  const m = $("#mixer"); m.innerHTML = "";
-  if (r.error) m.append(el("div", "muted", r.error));
-  if (!r.controls.length && !r.error) m.append(el("div", "muted", "Sem controlos."));
-  for (const c of r.controls) {
-    const box = el("div", "ctl");
-    const lab = el("label"); const v = el("span", "v");
-    lab.append(el("span", null, c.kind === "enum" ? c.name : `${c.name} · ${c.direction === "capture" ? "captura" : "saída"}`), v);
-    box.append(lab);
-    const post = body => fetch("/api/mixer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: c.id, kind: c.kind, direction: c.direction, ...body }) })
-      .then(async res => { if (!res.ok) toast((await res.json()).error); });
-    if (c.kind === "enum") {
-      const sel = el("select"); for (const it of c.items) { const o = el("option", null, it); o.value = it; sel.append(o); }
-      sel.value = c.value; sel.onchange = () => post({ value: sel.value }); box.append(sel);
-    } else {
-      const row = el("div", "row");
-      if (c.has_volume) {
-        const r2 = el("input"); r2.type = "range"; r2.min = 0; r2.max = 100; r2.value = c.percent ?? 0;
-        v.textContent = `${c.percent ?? "?"}%${c.db ? " · " + c.db : ""}`;
-        let t = null; r2.oninput = () => { v.textContent = r2.value + "%"; clearTimeout(t); t = setTimeout(() => post({ percent: +r2.value }), 60); };
-        row.append(r2);
-      }
-      if (c.has_switch) {
-        const cb = el("input"); cb.type = "checkbox"; cb.checked = !!c.on; cb.title = "ligado/mute";
-        cb.onchange = () => post({ on: cb.checked }); row.append(cb);
-      }
-      box.append(row);
-    }
-    m.append(box);
-  }
-  $("#cards").textContent = (await (await fetch("/api/cards")).json()).raw;
-}
-if ($("#mixerRefresh")) { $("#mixerRefresh").onclick = loadMixer; UI.tabs.mixer = { onShow: loadMixer }; }
-
 // ---------- separadores ----------
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));

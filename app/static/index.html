@@ -14,7 +14,7 @@
   <nav>
     <button class="tab active" data-tab="chain">Cadeia</button>
     <button class="tab" data-tab="plugins">Plugins</button>
-    <button class="tab" data-tab="mixer">Placa</button>
+    <button class="tab" data-tab="card">Placa</button>
   </nav>
 </header>
 
@@ -58,13 +58,19 @@
     <details id="pkgLogBox" class="cards" hidden><summary>Registo da última operação</summary><pre id="pkgLog"></pre></details>
   </section>
 
-  <section id="tab-mixer" hidden>
+  <section id="tab-card" hidden>
     <div class="toolbar">
-      <div><strong>Mixer ALSA</strong> <span id="mixerCard" class="muted"></span></div>
+      <div class="row">
+        <label for="cardSel"><strong>Placa</strong></label>
+        <select id="cardSel"></select>
+      </div>
       <button id="mixerRefresh">Atualizar</button>
     </div>
+    <div id="mixerNote" class="note" hidden></div>
     <div id="mixer" class="mixer"></div>
-    <details class="cards"><summary>Placas detetadas</summary><pre id="cards"></pre></details>
+    <h3 class="section-title">Interfaces de áudio detetadas</h3>
+    <div id="cardList" class="card-list"></div>
+    <details class="cards"><summary>Saída do aplay -l / arecord -l</summary><pre id="cardsRaw"></pre></details>
   </section>
 </main>
 
@@ -90,5 +96,6 @@
 <script src="/static/chain-edit.js"></script>
 <script src="/static/graph.js"></script>
 <script src="/static/plugins.js"></script>
+<script src="/static/card.js"></script>
 </body>
 </html>
