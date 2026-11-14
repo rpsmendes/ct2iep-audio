@@ -181,7 +181,7 @@ def library() -> list:
         if _world is None:
             reload()
         out = []
-        extra_root = os.environ.get("EXTRA_LV2_DIR", "/data/lv2")
+        extra_root = os.environ.get("EXTRA_LV2_ROOT", "/data/lv2")
         for plugin in _world.get_all_plugins():
             try:
                 n_in = n_out = n_sc = 0

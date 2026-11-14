@@ -9,6 +9,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - All repository content (code comments, UI text, configuration and
   documentation) is now written in English.
 
+### Fixed
+- Plugins installed from the UI now live in `data/lv2/bundles` (libraries in
+  `data/lv2/lib`, manifests in `data/lv2/packages`). Previously lilv also
+  scanned the bookkeeping directories inside `data/lv2` and filled the log with
+  harmless "Error loading file" messages. The old layout is migrated
+  automatically at startup.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

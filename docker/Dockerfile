@@ -40,9 +40,10 @@ RUN chmod +x /usr/local/bin/engine.sh \
     && ! ldd /usr/local/bin/mod-host | grep "not found" \
     && python3 -c "import numpy, lilv; w = lilv.World(); w.load_all(); print(len(w.get_all_plugins()), 'plugins LV2')"
 
-# /data/lv2: plugins installed on demand from the UI (persistent); .lib: libraries they need
+# /data/lv2/bundles: plugins installed on demand from the UI (persistent);
+# /data/lv2/lib: shared libraries they need
 ENV JACK_NO_AUDIO_RESERVATION=1 \
-    LV2_PATH=/usr/lib/lv2:/usr/local/lib/lv2:/data/lv2 \
-    EXTRA_LV2_DIR=/data/lv2 \
-    LD_LIBRARY_PATH=/data/lv2/.lib
+    LV2_PATH=/usr/lib/lv2:/usr/local/lib/lv2:/data/lv2/bundles \
+    EXTRA_LV2_ROOT=/data/lv2 \
+    LD_LIBRARY_PATH=/data/lv2/lib
 ENTRYPOINT ["/usr/bin/tini", "--"]

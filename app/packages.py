@@ -1,10 +1,11 @@
 """LV2 plugin packages installed on demand (without rebuilding the image).
 
 A Debian package is downloaded (apt-get download) and unpacked, and only its
-LV2 bundles are copied to /data/lv2, which is persistent and is in the
-LV2_PATH of both the engine and the UI. Shared libraries the plugins need that
-are not in the image go to /data/lv2/.lib (in LD_LIBRARY_PATH). Each package
-has a manifest in /data/lv2/.packages/<package>.json so it can be removed.
+LV2 bundles are copied to /data/lv2/bundles, which is persistent and is the
+only extra directory in the LV2_PATH of both the engine and the UI. Shared
+libraries the plugins need that are not in the image go to /data/lv2/lib (in
+LD_LIBRARY_PATH). Each package has a manifest in /data/lv2/packages/<package>.json
+so it can be removed.
 
 After installing/removing, the engine restarts mod-host (.rescan file) so it
 sees the new plugins; the chain is reloaded automatically.
@@ -22,10 +23,11 @@ from pathlib import Path
 
 log = logging.getLogger("audio-web")
 
-LV2_DIR = Path(os.environ.get("EXTRA_LV2_DIR", "/data/lv2"))
-LIB_DIR = LV2_DIR / ".lib"
-MANIFESTS = LV2_DIR / ".packages"
-RESCAN = LV2_DIR / ".rescan"
+ROOT = Path(os.environ.get("EXTRA_LV2_ROOT", "/data/lv2"))
+LV2_DIR = ROOT / "bundles"          # in LV2_PATH: only LV2 bundles live here
+LIB_DIR = ROOT / "lib"              # in LD_LIBRARY_PATH
+MANIFESTS = ROOT / "packages"
+RESCAN = ROOT / ".rescan"           # watched by engine.sh
 SYSTEM_LV2 = [Path("/usr/lib/lv2"), Path("/usr/local/lib/lv2")]
 SAFE_PKG = re.compile(r"^[a-z0-9][a-z0-9+.\-]{1,60}$")
 
@@ -186,7 +188,7 @@ async def install(pkg):
             raise PackageError(f"package {pkg} does not exist in this Debian release", logl)
         version = cand.group(1)
         LV2_DIR.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=LV2_DIR, prefix=".tmp-") as tmp:
+        with tempfile.TemporaryDirectory(dir=ROOT, prefix=".tmp-") as tmp:
             dl = Path(tmp) / "deb"
             dl.mkdir()
             await _run(["apt-get", "download", "-o", "APT::Sandbox::User=root", pkg], logl, cwd=dl)
@@ -280,6 +282,19 @@ async def remove(pkg, used_uris=()):
         return {"ok": True, "log": [f"removed: {', '.join(m['bundles'])}"]}
 
 
+def migrate_layout():
+    """0.2.0 layout (bundles, .lib and .packages directly in /data/lv2) -> current."""
+    if not ROOT.exists():
+        return
+    moves = [(ROOT / ".lib", LIB_DIR), (ROOT / ".packages", MANIFESTS)]
+    moves += [(b, LV2_DIR / b.name) for b in ROOT.glob("*.lv2") if b.is_dir()]
+    for src, dst in moves:
+        if src.exists() and not dst.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dst))
+            log.info("moved %s -> %s", src, dst)
+
+
 def request_rescan():
-    LV2_DIR.mkdir(parents=True, exist_ok=True)
+    ROOT.mkdir(parents=True, exist_ok=True)
     RESCAN.write_text(str(time.time()))

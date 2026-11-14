@@ -896,6 +896,7 @@ async def on_shutdown(app):
 
 
 def make_app():
+    packages.migrate_layout()
     lv2meta.reload()
     app = web.Application(middlewares=[auth_mw])
     app["factory"] = Factory(CHAIN_FILE)
