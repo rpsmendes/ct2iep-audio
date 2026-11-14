@@ -116,7 +116,7 @@ UI.hooks.panel.push((b, panel) => {
     if (G.data && G.data.blockId === b.id) drawCurves(box, G.data);
     scheduleGraph(0);
   } else if (b.graph_unsupported) {
-    panel.append(el("p", "hint", "No graph for this plugin: it cannot be measured offline (it has ports that lv2apply does not support)."));
+    panel.append(el("p", "hint", "No graph for this plugin: it cannot be measured offline (unsupported ports, a host feature it requires, or it crashed or produced invalid output)."));
   }
 });
 // any change in an EQ/filter changes the total; so does bypass (b null = bypass all)

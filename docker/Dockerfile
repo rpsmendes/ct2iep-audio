@@ -21,7 +21,7 @@ RUN echo "jackd2 jackd/tweak_rt_limits boolean false" | debconf-set-selections \
         liblilv-0-0 liblilv-dev libreadline8t64 libfftw3-single3 libfftw3-double3 \
         lsp-plugins-lv2 calf-plugins x42-plugins dragonfly-reverb-lv2 \
         python3 python3-lilv python3-aiohttp python3-yaml python3-numpy \
-        lilv-utils procps tini \
+        procps tini \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /src/mod-host/mod-host /usr/local/bin/mod-host
@@ -31,14 +31,17 @@ COPY docker/engine.sh /usr/local/bin/engine.sh
 COPY app /app
 # Build-time checks (fail here rather than at startup):
 #  - jack_lsp comes from jack-example-tools (engine.sh uses it to wait for JACK)
-#  - lv2apply (lilv-utils) measures the EQ curves for the UI graph
 #  - mod-host has no missing libraries
 #  - python3-lilv loads "liblilv-0.so", which Debian only ships in liblilv-dev
 RUN chmod +x /usr/local/bin/engine.sh \
     && command -v jack_lsp \
-    && command -v lv2apply \
     && ! ldd /usr/local/bin/mod-host | grep "not found" \
     && python3 -c "import numpy, lilv; w = lilv.World(); w.load_all(); print(len(w.get_all_plugins()), 'plugins LV2')"
+
+# Self-test of the EQ graph measurement host (informative, never fails the
+# build): a +12 dB bell at 1 kHz in the LSP EQ should print {"db": [~12.0]}
+RUN echo '{"uri":"http://lsp-plug.in/plugins/lv2/para_equalizer_x8_mono","params":{"ft_0":1,"f_0":1000,"g_0":3.981,"q_0":2},"points":[1000]}' \
+      | python3 /app/measure_host.py; echo " <- EQ graph self-test"
 
 # /data/lv2/bundles: plugins installed on demand from the UI (persistent);
 # /data/lv2/lib: shared libraries they need

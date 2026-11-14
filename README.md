@@ -38,8 +38,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the history of changes.
 
 Tools: **jackd2** (audio server), **mod-host** (LV2 host controlled over TCP,
 built from the MOD Audio source), **zita-ajbridge** (bridge to a second card),
-**alsa-utils** (mixer and card list), **lilv-utils** (`lv2apply`, for the EQ
-graph). Debian packages: `lsp-plugins-lv2`, `calf-plugins`, `x42-plugins`,
+**alsa-utils** (mixer and card list). Debian packages: `lsp-plugins-lv2`, `calf-plugins`, `x42-plugins`,
 `dragonfly-reverb-lv2`. Any other installed LV2 plugin can be added from the UI
 or to `config/chain.yaml`.
 
@@ -157,8 +156,9 @@ the radio. Use a foot switch on the rear PTT socket, VOX, or PTT over CAT/USB
 - **EQ graph**: EQs and filters show their frequency response (solid line =
   this block; dashed = sum of all active EQs/filters), with the typical SSB band
   shaded. The curve is computed by the plugin itself (an impulse processed
-  offline with `lv2apply`), so it is exact for every filter type and mode.
-  Plugins that cannot be measured offline (e.g. Calf and x42 fil4) show a note.
+  offline by a small built-in LV2 host, `app/measure_host.py`, in a separate
+  low-priority process), so it is exact for every filter type and mode. Works
+  with LSP, Calf and x42 EQs; plugins that cannot be measured show a note.
 - **Presets**: *Save as…* stores the complete chain: order, blocks and values
   (e.g. "SSB DX", "SSB ragchew"). Older presets still load.
 - **Reset values** (on a block) goes back to the `chain.yaml` values, or to the
@@ -234,7 +234,7 @@ If a Dockerfile change seems to have no effect:
   - `docker/`: image and engine startup (`engine.sh`: JACK, zita bridges,
     mod-host, mod-host restart when plugins change)
   - `app/server.py`: API and mod-host connection; `app/lv2meta.py`: LV2
-    metadata and library; `app/response.py`: EQ curves; `app/packages.py`:
+    metadata and library; `app/response.py` + `app/measure_host.py`: EQ curves; `app/packages.py`:
     plugin packages on demand
   - `app/static/`: UI (`app.js` core; `chain-edit.js`, `graph.js`,
     `plugins.js`, `card.js` one per feature)

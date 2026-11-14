@@ -10,15 +10,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   documentation) is now written in English.
 
 ### Fixed
+- **Empty EQ graph on Debian 13**: `lv2apply` crashed with the LSP plugins
+  shipped by Debian 13 (1.2.21), which need their atom ports connected. The
+  curve is now measured by a small built-in LV2 host (`app/measure_host.py`,
+  separate low-priority process) that connects every port and provides the
+  usual host features. As a bonus, Calf EQs and x42 fil4 now get a graph too.
+  `lilv-utils` is no longer needed in the image.
 - Bursts of XRuns every ~23 s with the UA22: USB clock drift between the card
   and the PC exhausted the 128×2 buffer. The default is now `PERIOD=256`,
   `NPERIODS=3` (as JACK recommends for USB cards); existing installations must
   change these two lines in their `.env`.
 - Repeated XRuns at startup and while the EQ graph refreshes: the web
   service no longer competes with the real-time audio engine for CPU. It runs
-  at a lower priority (`WEB_NICE`, default 10), `lv2apply` runs at the lowest
-  priority and only loads the measured plugin's bundle, one measurement at a
-  time, and the plugin library is no longer scanned at startup (only when the
+  at a lower priority (`WEB_NICE`, default 10), the EQ measurement runs at the
+  lowest priority and only loads the measured plugin's bundle, one at a time, and the plugin library is no longer scanned at startup (only when the
   **+** library is first opened).
 - Plugins installed from the UI now live in `data/lv2/bundles` (libraries in
   `data/lv2/lib`, manifests in `data/lv2/packages`). Previously lilv also

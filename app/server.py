@@ -721,20 +721,17 @@ async def h_response(request):
     parts = [b for b in st["blocks"] if views[b["id"]]["graph"] and not b["bypass"]
              and not views[b["id"]]["missing"]]
 
-    def chans(b):
-        return max(1, len(lv2meta.describe(b["uri"])["audio_in"]))
-
     def bundle(b):
         return lv2meta.bundle_dirs_of(b["uri"])
 
     try:
-        curve = await response.measure(target["uri"], target["params"], chans(target), bundle(target))
+        curve = await response.measure(target["uri"], target["params"], bundle(target))
     except Exception as e:  # noqa: BLE001
         log.warning("frequency response of %s: %s", target["id"], e)
         return err(f"could not compute the curve: {e}", 500)
     total, used = None, []
     if not st["chain_bypass"] and parts:
-        res = await asyncio.gather(*(response.measure(b["uri"], b["params"], chans(b), bundle(b)) for b in parts),
+        res = await asyncio.gather(*(response.measure(b["uri"], b["params"], bundle(b)) for b in parts),
                                    return_exceptions=True)
         ok = [(b, c) for b, c in zip(parts, res) if not isinstance(c, Exception)]
         if ok:
@@ -942,7 +939,7 @@ def make_app():
 
 
 if __name__ == "__main__":
-    # The web UI, the EQ graph (lv2apply) and package installs must never take
+    # The web UI, the EQ graph measurements and package installs must never take
     # CPU time away from the real-time audio engine: run them all at a lower
     # priority (children inherit it).
     try:

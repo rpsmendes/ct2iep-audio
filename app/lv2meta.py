@@ -68,6 +68,8 @@ def reload():
             "toggled": w.new_uri("http://lv2plug.in/ns/lv2core#toggled"),
             "integer": w.new_uri("http://lv2plug.in/ns/lv2core#integer"),
             "sidechain": w.new_uri("http://lv2plug.in/ns/lv2core#isSideChain"),
+            "atom": w.new_uri("http://lv2plug.in/ns/ext/atom#AtomPort"),
+            "cv": w.new_uri(lilv.LILV_URI_CV_PORT),
             "optional": w.new_uri("http://lv2plug.in/ns/lv2core#connectionOptional"),
             "notonui": w.new_uri("http://lv2plug.in/ns/ext/port-props#notOnGUI"),
         }
@@ -130,8 +132,9 @@ def describe(uri: str) -> dict:
                     d["audio_in"].append(sym)
                 continue
             if not p.is_a(_N["control"]):
-                # mandatory atom/event/CV ports: lv2apply does not support them
-                if not p.has_property(_N["optional"]):
+                # atom and CV ports are fine for the measurement host;
+                # anything else (e.g. old event ports) is not
+                if not (p.is_a(_N["atom"]) or p.is_a(_N["cv"])):
                     d["measurable"] = False
                 continue
             default, mn, mx = p.get_range()
