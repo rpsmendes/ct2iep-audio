@@ -195,13 +195,14 @@ has `PCM` and `Mic`.
 | Change the order / add / remove blocks | in the UI (Chain tab) |
 | Change the factory chain | `config/chain.yaml` → `docker compose restart web` → *Factory chain* in the UI |
 | Get more plugins | Plugins tab (or `docker compose exec web ls /data/lv2/bundles`) |
-| Lower the latency | `.env`: `PERIOD=64` (if you hear clicks, go back to 128 or use `NPERIODS=3`) |
+| Lower the latency | `.env`: `PERIOD=128` (watch the log for XRuns; USB cards usually need `NPERIODS=3`) |
 | See errors | `docker compose logs -f engine web` |
 | Test Python/plugins in the image | `docker compose run --rm --no-deps web python3 -c "import lilv; print('ok')"` |
 | Update | `git pull && docker compose build && docker compose up -d` |
 
-Expected latency: 2 periods × 128 samples at 48 kHz ≈ 5.3 ms + USB buffers and
-the limiter lookahead (2 ms) → about 10–15 ms round trip.
+Expected latency: 3 periods × 256 samples at 48 kHz ≈ 16 ms of buffer + USB
+buffers and the limiter lookahead (2 ms) → about 20–25 ms round trip, which is
+not noticeable on SSB.
 
 ## 6. Troubleshooting (issues solved during installation)
 
@@ -216,8 +217,9 @@ the limiter lookahead (2 ms) → about 10–15 ms round trip.
 Normal messages when the engine starts: `jack_get_descriptor returns null for
 'jack_intime.so'` (and similar) and **one** XRun from `mod-monitor` while the
 plugins load. It is only a problem if XRuns keep happening while audio is
-running: `docker compose logs -f engine | grep -i xrun` → if they repeat, use
-`NPERIODS=3` or `PERIOD=256`.
+running: `docker compose logs -f -t engine | grep -i xrun`. Bursts at a regular
+interval (e.g. every ~23 s) point to USB clock drift between the card and the
+PC: use a bigger buffer (`PERIOD=256`, `NPERIODS=3`, the default).
 
 If a Dockerfile change seems to have no effect:
 `docker compose build --no-cache && docker compose up -d --force-recreate`.

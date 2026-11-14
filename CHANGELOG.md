@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   documentation) is now written in English.
 
 ### Fixed
+- Bursts of XRuns every ~23 s with the UA22: USB clock drift between the card
+  and the PC exhausted the 128×2 buffer. The default is now `PERIOD=256`,
+  `NPERIODS=3` (as JACK recommends for USB cards); existing installations must
+  change these two lines in their `.env`.
 - Repeated XRuns at startup and while the EQ graph refreshes: the web
   service no longer competes with the real-time audio engine for CPU. It runs
   at a lower priority (`WEB_NICE`, default 10), `lv2apply` runs at the lowest
