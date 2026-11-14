@@ -214,3 +214,4 @@ code { font-family: var(--mono); font-size: 12px; }
   .panel .head { flex-direction: column; }
   .panel .actions { justify-content: flex-start; }
 }
+.meter.off { opacity: .4; }

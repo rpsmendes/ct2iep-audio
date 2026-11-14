@@ -217,7 +217,7 @@ function renderStrip() {
 }
 function setBypass(b, val) {
   b.bypass = val; send({ type: "bypass", block: b.id, value: val });
-  renderStrip(); if (UI.selected === b.id) renderPanel(); UI.hooks.param.forEach(f => f(b));
+  renderStrip(); renderMeters(); if (UI.selected === b.id) renderPanel(); UI.hooks.param.forEach(f => f(b));
 }
 
 // ---------- block panel ----------
@@ -318,7 +318,8 @@ function renderMeters() {
   const m = $("#meters"); m.innerHTML = ""; for (const k in meterEls) delete meterEls[k];
   for (const b of UI.chain.blocks) for (const mt of b.meters) {
     const key = `${b.id}.${mt.symbol}`;
-    const d = el("div", "meter" + (mt.kind === "gr" ? " gr" : ""));
+    const off = b.bypass || UI.chain.chain_bypass;     // unloaded: no readings
+    const d = el("div", "meter" + (mt.kind === "gr" ? " gr" : "") + (off ? " off" : ""));
     const top = el("div", "top"); const v = el("span", "val", "—");
     top.append(el("span", null, mt.label), v);
     const bar = el("div", "bar"); const f = el("div", "fill"); bar.append(f); d.append(top, bar); m.append(d);
@@ -364,7 +365,8 @@ $("#presetDel").onclick = async () => {
 };
 $("#abBtn").onclick = () => {
   UI.chain.chain_bypass = !UI.chain.chain_bypass; send({ type: "chain_bypass", value: UI.chain.chain_bypass });
-  renderStrip(); UI.hooks.param.forEach(f => f(null));
+  renderStrip(); renderMeters(); UI.hooks.param.forEach(f => f(null));
+  if (!UI.chain.chain_bypass) toast("Loading the plugins again…", 1500);
 };
 $("#factoryReset")?.addEventListener("click", async () => {
   if (!confirm("Restore the factory chain (config/chain.yaml)? The current order, blocks and values will be lost (save a preset first if you want to keep them).")) return;

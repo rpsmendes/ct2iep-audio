@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Changed
+- **A/B and block bypass now really switch plugins off.** mod-host's own
+  bypass keeps running the plugin every cycle, so CPU use did not drop. Now a
+  bypassed block is unloaded and the signal is wired around it; A/B unloads
+  every plugin and connects the input straight to the output. Switching a block
+  (or the whole chain) back on loads it again in a fraction of a second, while
+  the signal keeps flowing on the old path. Meters of switched-off blocks are
+  greyed out.
 - All repository content (code comments, UI text, configuration and
   documentation) is now written in English.
 

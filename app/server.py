@@ -258,6 +258,7 @@ class Engine:
         self.next_inst = 0
         self.links = set()        # JACK connections we made
         self.errors = {}          # block id -> load error
+        self.failed = {}          # block id -> uri that failed to load (not retried)
         self.meter_values = {}
 
     async def cmd(self, line: str, quiet=False) -> str:
@@ -272,24 +273,28 @@ class Engine:
                 log.warning("mod-host: '%s' -> %s", line, resp)
             return resp
 
-    def effective_bypass(self, b):
-        return self.app["rt"]["state"]["chain_bypass"] or b["bypass"]
+    def wanted(self, b):
+        """Only blocks that are switched on run in mod-host. A bypassed block is
+        unloaded and the signal is wired around it: mod-host's own bypass keeps
+        calling the plugin every cycle, so it would still use CPU."""
+        return not self.app["rt"]["state"]["chain_bypass"] and not b["bypass"]
 
     async def load_block(self, b):
         self.errors.pop(b["id"], None)
         if not plugin_available(b["uri"]):
             self.errors[b["id"]] = "plugin not installed"
+            self.failed[b["id"]] = b["uri"]
             return False
         i = self.next_inst
         self.next_inst += 1
         r = await self.cmd(f'add "{b["uri"]}" {i}')
         if r.startswith("resp -"):
             self.errors[b["id"]] = f"mod-host refused the plugin ({r[5:]})"
+            self.failed[b["id"]] = b["uri"]
             return False
         self.inst[b["id"]] = i
         for s, v in b["params"].items():
             await self.cmd(f"param_set {i} {s} {v:.6g}", quiet=True)
-        await self.cmd(f"bypass {i} {int(self.effective_bypass(b))}")
         meta = lv2meta.describe(b["uri"])
         for m in block_view(self.app, b)["meters"]:
             if m["symbol"] in meta["outputs"]:
@@ -299,6 +304,7 @@ class Engine:
     async def unload_block(self, bid):
         i = self.inst.pop(bid, None)
         self.errors.pop(bid, None)
+        self.failed.pop(bid, None)
         if i is None:
             return
         pref = f"effect_{i}:"
@@ -313,7 +319,7 @@ class Engine:
         links = set()
         for b in self.app["rt"]["state"]["blocks"]:
             i = self.inst.get(b["id"])
-            if i is None:
+            if i is None or not self.wanted(b):
                 continue
             meta = lv2meta.describe(b["uri"])
             for s in src:
@@ -334,12 +340,23 @@ class Engine:
             await self.cmd(f'connect "{a}" "{b}"')
         self.links = new
 
+    async def sync(self):
+        """Brings mod-host in line with the state: loads the blocks that must run,
+        rewires, and only then unloads the blocks that must not run (bypassed or
+        removed), so the signal never stops while plugins are being loaded."""
+        blocks = self.app["rt"]["state"]["blocks"]
+        for b in blocks:
+            if self.wanted(b) and b["id"] not in self.inst and self.failed.get(b["id"]) != b["uri"]:
+                await self.load_block(b)
+        await self.rewire()
+        keep = {b["id"] for b in blocks if self.wanted(b)}
+        for bid in [k for k in self.inst if k not in keep]:
+            await self.unload_block(bid)
+
     async def build(self):
         await self.cmd("remove -1")
-        self.inst, self.links, self.errors, self.next_inst = {}, set(), {}, 0
-        for b in self.app["rt"]["state"]["blocks"]:
-            await self.load_block(b)
-        await self.rewire()
+        self.inst, self.links, self.errors, self.failed, self.next_inst = {}, set(), {}, {}, 0
+        await self.sync()
         await self.cmd("output_data_ready")
         log.info("chain loaded (%d blocks)", len(self.inst))
 
@@ -433,13 +450,16 @@ async def op_param(app, bid, sym, value, origin=None):
     await broadcast(app, {"type": "param", "block": bid, "symbol": sym, "value": v}, exclude=origin)
 
 
-async def apply_bypass_all(app):
-    eng: Engine = app["engine"]
-    if eng.online:
-        for b in app["rt"]["state"]["blocks"]:
-            i = eng.inst.get(b["id"])
-            if i is not None:
-                await eng.cmd(f"bypass {i} {int(eng.effective_bypass(b))}")
+async def op_bypass(app, bid, value):
+    """Block bypass (bid) or A/B (bid None): loads/unloads plugins accordingly."""
+    async with app["rt"]["oplock"]:
+        if bid is None:
+            app["rt"]["state"]["chain_bypass"] = bool(value)
+        else:
+            find_block(app, bid)["bypass"] = bool(value)
+        if app["engine"].online:
+            await app["engine"].sync()
+    schedule_save(app)
 
 
 async def op_move(app, order):
@@ -466,8 +486,7 @@ async def op_add(app, uri, at=None):
         st["blocks"].insert(pos, b)
         eng: Engine = app["engine"]
         if eng.online:
-            await eng.load_block(b)
-            await eng.rewire()
+            await eng.sync()
     await chain_changed(app)
     return b["id"]
 
@@ -477,11 +496,9 @@ async def op_remove(app, bid):
         st = app["rt"]["state"]
         find_block(app, bid)
         eng: Engine = app["engine"]
-        if eng.online:
-            await eng.unload_block(bid)
         st["blocks"] = [b for b in st["blocks"] if b["id"] != bid]
         if eng.online:
-            await eng.rewire()
+            await eng.sync()
     await chain_changed(app)
 
 
@@ -499,13 +516,10 @@ async def op_apply_state(app, new_state):
                     await eng.unload_block(bid)
             for b in new["blocks"]:
                 i = eng.inst.get(b["id"])
-                if i is None:
-                    await eng.load_block(b)
-                    continue
-                for s, v in b["params"].items():
-                    await eng.cmd(f"param_set {i} {s} {v:.6g}", quiet=True)
-            await apply_bypass_all(app)
-            await eng.rewire()
+                if i is not None:
+                    for s, v in b["params"].items():
+                        await eng.cmd(f"param_set {i} {s} {v:.6g}", quiet=True)
+            await eng.sync()
     await chain_changed(app)
 
 
@@ -862,15 +876,13 @@ async def h_ws(request):
                 if t == "param":
                     await op_param(app, m["block"], m["symbol"], m["value"], origin=ws)
                 elif t == "bypass":
-                    find_block(app, m["block"])["bypass"] = bool(m["value"])
-                    await apply_bypass_all(app)
-                    schedule_save(app)
+                    await op_bypass(app, m["block"], m["value"])
                     await broadcast(app, m, exclude=ws)
+                    await broadcast(app, {"type": "chain", "chain": chain_view(app)})
                 elif t == "chain_bypass":
-                    app["rt"]["state"]["chain_bypass"] = bool(m["value"])
-                    await apply_bypass_all(app)
-                    schedule_save(app)
+                    await op_bypass(app, None, m["value"])
                     await broadcast(app, m, exclude=ws)
+                    await broadcast(app, {"type": "chain", "chain": chain_view(app)})
             except Exception as e:  # noqa: BLE001
                 log.warning("invalid ws message: %s (%s)", msg.data[:200], e)
                 await ws.send_str(json.dumps({"type": "error", "message": str(e)}))

@@ -137,7 +137,8 @@ the radio. Use a foot switch on the rear PTT socket, VOX, or PTT over CAT/USB
 
 ### Chain
 - **Block strip** (like in Waveform): click a block to see its parameters; the
-  ⏻ button switches that block on/off (bypass).
+  ⏻ button switches that block on/off. A switched-off block is unloaded from
+  the engine and the signal goes around it, so it uses no CPU.
 - **Change the order**: drag a block by its **⋮⋮** handle to another position,
   or use **◀ ▶** in the block panel. Only the JACK connections that change are
   redone (a few milliseconds of silence).
@@ -146,8 +147,9 @@ the radio. Use a foot switch on the rear PTT socket, VOX, or PTT over CAT/USB
   after the selected block. **Remove** in the panel takes the block out of the
   chain. The chain is mono: stereo plugins get the same signal on both inputs
   and only the left output continues; sidechain inputs are left unconnected.
-- **A/B · Bypass all**: switches the whole chain off to compare with the
-  original sound.
+- **A/B · Bypass all**: takes every plugin out (unloaded, no CPU use) and
+  connects the input straight to the output, to compare with the original
+  sound. Switching back loads the plugins again in a fraction of a second.
 - **Sliders**: drag to adjust (clicking does not change the value, so there are
   no jumps while transmitting). **Shift** or **Fine** = 10× finer. On a focused
   slider: arrow keys (gains ±0.5 dB, ±0.1 dB with Shift), PageUp/PageDown,
