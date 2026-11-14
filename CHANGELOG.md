@@ -23,6 +23,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   filters (in the image / installed from the UI) and pages of 20/50/100.
 
 ### Changed
+- **Compose services renamed** `engine` → `audio-engine` and `web` →
+  `audio-web` (same as the container names), so this file can be included in a
+  central compose file with other stacks. Commands such as
+  `docker compose logs web` become `docker compose logs audio-web`.
 - **A/B and block bypass now really switch plugins off.** mod-host's own
   bypass keeps running the plugin every cycle, so CPU use did not drop. Now a
   bypassed block is unloaded and the signal is wired around it; A/B unloads

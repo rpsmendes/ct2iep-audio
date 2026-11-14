@@ -83,8 +83,8 @@ nano .env                 # AUDIO_CARD and WEB_PASSWORD (see below)
 
 docker compose build      # the first build takes a few minutes (compiles mod-host)
 docker compose up -d
-docker compose logs -f engine   # "JACK ready" and "mod-host listening on 5555/5556"
-docker compose logs web         # "chain loaded (10 blocks)"
+docker compose logs -f audio-engine   # "JACK ready" and "mod-host listening on 5555/5556"
+docker compose logs audio-web         # "chain loaded (10 blocks)"
 ```
 
 UI: **http://&lt;server-ip&gt;:8080** (user `ct2iep` and the password from `.env`).
@@ -121,7 +121,7 @@ receive the processed audio is chosen in the UI** (Card tab → *Output*).
   if you do not want both. The UA22 stays the clock master (`AUDIO_CARD`); the
   radio's card is fed through a zita-j2a bridge that resamples between the two
   clocks (a few ms more latency). The bridge is started by the engine
-  (`docker compose logs engine | grep bridge`) and restarted if the radio is
+  (`docker compose logs audio-engine | grep bridge`) and restarted if the radio is
   switched off and on again.
 
 **On the radio:** the SSB modulation source must be the rear input (REAR) and,
@@ -215,17 +215,31 @@ software-controllable gains (it only exposes "MIDI Input Mode"): input gain and
 volume are set with the card's own knobs. The FTDX-101D USB CODEC, for example,
 has `PCM` and `Mic`.
 
+### Running it together with other stacks
+The services are named `audio-engine` and `audio-web` so this file can be
+included in a central compose file, e.g. `/home/opt/compose.yaml`:
+
+```yaml
+name: station
+include:
+  - ct2iep-audio/docker-compose.yml
+  - portainer/compose.yaml
+```
+
+Relative paths (`./data`, `./config`, `.env`) keep resolving from this
+folder. Then everything is managed from `/home/opt` with `docker compose ...`.
+
 ## 5. Common adjustments
 
 | I want to… | Where |
 |---|---|
 | Change the order / add / remove blocks | in the UI (Chain tab) |
-| Change the factory chain | `config/chain.yaml` → `docker compose restart web` → *Factory chain* in the UI |
-| Change / add built-in presets | `config/presets.yaml` → `docker compose restart web` |
-| Get more plugins | Plugins tab (or `docker compose exec web ls /data/lv2/bundles`) |
+| Change the factory chain | `config/chain.yaml` → `docker compose restart audio-web` → *Factory chain* in the UI |
+| Change / add built-in presets | `config/presets.yaml` → `docker compose restart audio-web` |
+| Get more plugins | Plugins tab (or `docker compose exec audio-web ls /data/lv2/bundles`) |
 | Lower the latency | `.env`: `PERIOD=128` (watch the log for XRuns; USB cards usually need `NPERIODS=3`) |
-| See errors | `docker compose logs -f engine web` |
-| Test Python/plugins in the image | `docker compose run --rm --no-deps web python3 -c "import lilv; print('ok')"` |
+| See errors | `docker compose logs -f audio-engine audio-web` |
+| Test Python/plugins in the image | `docker compose run --rm --no-deps audio-web python3 -c "import lilv; print('ok')"` |
 | Update | `git pull && docker compose build && docker compose up -d` |
 
 Expected latency: 3 periods × 256 samples at 48 kHz ≈ 16 ms of buffer + USB
@@ -245,7 +259,7 @@ not noticeable on SSB.
 Normal messages when the engine starts: `jack_get_descriptor returns null for
 'jack_intime.so'` (and similar) and **one** XRun from `mod-monitor` while the
 plugins load. It is only a problem if XRuns keep happening while audio is
-running: `docker compose logs -f -t engine | grep -i xrun`. Bursts at a regular
+running: `docker compose logs -f -t audio-engine | grep -i xrun`. Bursts at a regular
 interval (e.g. every ~23 s) point to USB clock drift between the card and the
 PC: use a bigger buffer (`PERIOD=256`, `NPERIODS=3`, the default).
 

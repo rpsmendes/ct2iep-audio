@@ -1,4 +1,6 @@
 name: ct2iep-audio
+# Service names are prefixed (audio-*) so this file can be included in a
+# central compose file next to other stacks without name clashes.
 
 x-image: &image
   image: ct2iep-audio:latest
@@ -7,7 +9,7 @@ x-image: &image
     dockerfile: docker/Dockerfile
 
 services:
-  engine:
+  audio-engine:
     <<: *image
     container_name: audio-engine
     command: ["/usr/local/bin/engine.sh"]
@@ -30,18 +32,18 @@ services:
       - "5555"            # mod-host commands (compose internal network only)
       - "5556"            # feedback (meters)
 
-  web:
+  audio-web:
     <<: *image
     container_name: audio-web
     command: ["python3", "/app/server.py"]
     env_file: .env
     environment:
-      MODHOST_HOST: engine
+      MODHOST_HOST: audio-engine
       CHAIN_FILE: /config/chain.yaml
       DATA_DIR: /data
     restart: unless-stopped
     depends_on:
-      - engine
+      - audio-engine
     devices:
       - /dev/snd:/dev/snd # for the ALSA mixer and card list
     group_add:
