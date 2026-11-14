@@ -1,17 +1,19 @@
-# Cadeia de processamento TX (equivalente à cadeia do Waveform).
-# Ordem = ordem do sinal. Edita e reinicia o serviço web:  docker compose restart web
+# Factory TX processing chain (equivalent to the Waveform chain).
+# Order = signal order. This is the initial chain and what "Factory chain" in
+# the UI restores; the running chain (order, blocks, values) lives in
+# data/state.json. After editing: docker compose restart web
 #
-# Valores dos parâmetros estão nas unidades do plugin.
-# Para ganhos podes escrever em dB (ex.: "-40dB"): é convertido para coeficiente linear.
-# "main" = parâmetros mostrados logo na UI; os restantes ficam em "Avançado".
-# "bypass: true" = bloco carregado mas desligado (ativa-se na UI).
-# meters: kind "level" (nível, -60..0 dB) ou "gr" (redução de ganho).
+# Parameter values are in the plugin's units.
+# Gains can be written in dB (e.g. "-40dB"): converted to a linear coefficient.
+# "main" = parameters shown directly in the UI; the rest go under "Advanced".
+# "bypass: true" = block loaded but switched off (switch it on in the UI).
+# meters: kind "level" (level, -60..0 dB) or "gr" (gain reduction).
 
 io:
-  # entrada do microfone (canal 1 da placa principal)
+  # microphone input (channel 1 of the main card)
   inputs: ["system:capture_1"]
-  # saídas: placa principal (L+R). Para o USB do FTDX usa
-  #   ["ftdx_out:playback_1", "ftdx_out:playback_2"]   (e FTDX_CARD no .env)
+  # outputs: main card (L+R). For the FTDX USB use
+  #   ["ftdx_out:playback_1", "ftdx_out:playback_2"]   (and FTDX_CARD in .env)
   outputs: ["system:playback_1", "system:playback_2"]
 
 blocks:
@@ -22,32 +24,32 @@ blocks:
     main: [gt, gr, at, rt, gh, ht]
     params: { gt: "-50dB", gr: "-24dB", at: 2, rt: 250, gh: 1, ht: "-56dB" }
     meters:
-      - { symbol: ilm, label: "Entrada" }
+      - { symbol: ilm, label: "Input" }
       - { symbol: rlm, label: "Gate", kind: gr }
 
   - id: bass
     name: Bass Enhancer
     replaces: Waves RBass
     uri: http://calf.sourceforge.net/plugins/BassEnhancer
-    bypass: true          # em SSB os graves são cortados; liga só se quiseres "corpo"
+    bypass: true          # lows are cut in SSB anyway; enable only if you want more "body"
     main: [amount, drive, freq, level_out]
     params: { amount: 0.5, drive: 4, freq: 180 }
 
   - id: eq
-    name: EQ paramétrico
+    name: Parametric EQ
     replaces: PuigTec MEQ5 + F6 + OneKnob Brighter
     uri: http://lsp-plug.in/plugins/lv2/para_equalizer_x8_mono
-    # banda 0: passa-altos 120 Hz (Butterworth, -3 dB aos 120 Hz)
-    # banda 1: corte de "lama" 300 Hz | banda 2: presença 1,8 kHz
-    # banda 3: brilho (hi-shelf) 2,4 kHz
-    # Nota: no LSP o "q" define a largura dos Bell (q=0 = larguíssimo);
-    # o "Filter Width" (w_N) não afeta os Bell.
+    # band 0: high-pass 120 Hz (Butterworth, -3 dB at 120 Hz)
+    # band 1: "mud" cut at 300 Hz | band 2: presence at 1.8 kHz
+    # band 3: brightness (high shelf) at 2.4 kHz
+    # Note: in LSP the "q" sets the width of the Bell filters (q=0 = extremely
+    # wide); "Filter Width" (w_N) does not affect Bell filters.
     main: [ft_0, f_0, s_0, ft_1, f_1, g_1, q_1, ft_2, f_2, g_2, q_2, ft_3, f_3, g_3, g_out]
     params:
       ft_0: 2   # Hi-pass
       fm_0: 2   # BWC (BT) = Butterworth
       f_0: 120
-      s_0: 1    # x2 (24 dB/oitava)
+      s_0: 1    # x2 (24 dB/octave)
       ft_1: 1   # Bell
       f_1: 300
       g_1: "-3dB"
@@ -62,7 +64,7 @@ blocks:
 
   - id: comp
     name: Compressor
-    replaces: GW ToneCentric (dinâmica)
+    replaces: GW ToneCentric (dynamics)
     uri: http://lsp-plug.in/plugins/lv2/compressor_mono
     main: [al, cr, kn, at, rt, mk]
     params: { al: "-24dB", cr: 4, kn: "-6dB", at: 8, rt: 120, mk: "8dB" }
@@ -70,8 +72,8 @@ blocks:
       - { symbol: rlm, label: "Comp", kind: gr }
 
   - id: sat
-    name: Saturação
-    replaces: GW ToneCentric (cor)
+    name: Saturation
+    replaces: GW ToneCentric (colour)
     uri: http://calf.sourceforge.net/plugins/Saturator
     bypass: true
     main: [drive, blend, mix, level_out]
@@ -97,25 +99,25 @@ blocks:
     name: Plate Reverb
     replaces: Abbey Road Plates
     uri: urn:dragonfly:plate
-    bypass: true          # reverb em TX costuma prejudicar a inteligibilidade
+    bypass: true          # reverb on TX usually hurts intelligibility
     main: [dry_level, early_level, decay, predelay]
     params: { dry_level: 100, early_level: 8, decay: 0.4 }
 
   - id: lpf
-    name: Passa-baixos (largura de banda)
-    replaces: limite de banda SSB
+    name: Low-pass (bandwidth)
+    replaces: SSB bandwidth limit
     uri: http://lsp-plug.in/plugins/lv2/filter_mono
     main: [ft, fm, f, s]
-    # Lo-pass Butterworth x4: -0,4 dB aos 2,5 kHz, -3 dB aos 2,9 kHz, -14 dB aos 3,5 kHz
+    # Butterworth low-pass x4: -0.4 dB at 2.5 kHz, -3 dB at 2.9 kHz, -14 dB at 3.5 kHz
     params: { ft: 0, fm: 2, f: 2900, s: 3 }
 
   - id: limiter
     name: Limiter
     replaces: Waves L1
     uri: http://lsp-plug.in/plugins/lv2/limiter_mono
-    # brickwall a -3 dBFS; lookahead 2 ms (latência baixa); sem oversampling
+    # brickwall at -3 dBFS; 2 ms lookahead (low latency); no oversampling
     main: [g_in, th, lk, rt, g_out]
     params: { g_in: "0dB", th: "-3dB", boost: 0, alr: 0, mode: 0, lk: 2, at: 2, rt: 10, ovs: 0 }
     meters:
       - { symbol: grlm, label: "Limiter", kind: gr }
-      - { symbol: olm, label: "Saída" }
+      - { symbol: olm, label: "Output" }

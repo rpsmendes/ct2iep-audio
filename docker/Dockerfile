@@ -1,7 +1,7 @@
-# Imagem única usada pelos dois serviços (engine e web).
-# Contém: JACK, zita-ajbridge, mod-host (compilado), plugins LV2 e o backend web.
+# Single image used by both services (engine and web).
+# Contains: JACK, zita-ajbridge, mod-host (built from source), LV2 plugins and the web backend.
 
-# ---------- 1) compilar o mod-host ----------
+# ---------- 1) build mod-host ----------
 FROM debian:trixie-slim AS build
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -12,7 +12,7 @@ ARG MOD_HOST_REF=master
 RUN git clone --depth 1 --branch ${MOD_HOST_REF} https://github.com/mod-audio/mod-host.git /src/mod-host \
     && make -C /src/mod-host -j"$(nproc)"
 
-# ---------- 2) imagem final ----------
+# ---------- 2) final image ----------
 FROM debian:trixie-slim
 ARG DEBIAN_FRONTEND=noninteractive
 RUN echo "jackd2 jackd/tweak_rt_limits boolean false" | debconf-set-selections \
@@ -29,18 +29,18 @@ COPY --from=build /src/mod-host/*.so /usr/local/lib/mod-host/
 
 COPY docker/engine.sh /usr/local/bin/engine.sh
 COPY app /app
-# Verificações no build (falha logo aqui em vez de falhar no arranque):
-#  - jack_lsp vem do jack-example-tools (o engine.sh usa-o para esperar pelo JACK)
-#  - lv2apply (lilv-utils) mede a curva dos EQs para o gráfico da UI
-#  - mod-host sem bibliotecas em falta
-#  - python3-lilv carrega "liblilv-0.so", que no Debian só vem no liblilv-dev
+# Build-time checks (fail here rather than at startup):
+#  - jack_lsp comes from jack-example-tools (engine.sh uses it to wait for JACK)
+#  - lv2apply (lilv-utils) measures the EQ curves for the UI graph
+#  - mod-host has no missing libraries
+#  - python3-lilv loads "liblilv-0.so", which Debian only ships in liblilv-dev
 RUN chmod +x /usr/local/bin/engine.sh \
     && command -v jack_lsp \
     && command -v lv2apply \
     && ! ldd /usr/local/bin/mod-host | grep "not found" \
     && python3 -c "import numpy, lilv; w = lilv.World(); w.load_all(); print(len(w.get_all_plugins()), 'plugins LV2')"
 
-# /data/lv2: plugins instalados a pedido pela UI (persistentes); .lib: bibliotecas que precisem
+# /data/lv2: plugins installed on demand from the UI (persistent); .lib: libraries they need
 ENV JACK_NO_AUDIO_RESERVATION=1 \
     LV2_PATH=/usr/lib/lv2:/usr/local/lib/lv2:/data/lv2 \
     EXTRA_LV2_DIR=/data/lv2 \

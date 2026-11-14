@@ -1,9 +1,10 @@
-"""Resposta em frequência de um plugin, medida com o próprio plugin.
+"""Frequency response of a plugin, measured with the plugin itself.
 
-Passa um impulso pelo plugin offline (lv2apply, do pacote lilv-utils) com os
-parâmetros atuais e calcula a magnitude por FFT. Assim a curva mostrada é a
-real para qualquer tipo/modo de filtro, sem reimplementar as fórmulas.
-Só faz sentido para plugins lineares (EQ e filtros).
+An impulse is run through the plugin offline (lv2apply, from the lilv-utils
+package) with the current parameters and the magnitude is computed with an
+FFT. The curve shown is therefore the real one for any filter type/mode,
+without reimplementing the formulas. Only meaningful for linear plugins (EQs
+and filters).
 """
 import asyncio
 import hashlib
@@ -19,10 +20,10 @@ import numpy as np
 log = logging.getLogger("audio-web")
 
 SR = 48000
-N = 32768                     # ~0,7 s: cobre a latência dos modos FIR/FFT do LSP
+N = 32768                     # ~0.7 s: covers the latency of the LSP FIR/FFT modes
 POINTS = np.geomspace(20, 20000, 240)
 _cache = OrderedDict()
-BROKEN = set()                # plugins com que o lv2apply rebentou (não voltar a tentar)
+BROKEN = set()                # plugins that crashed lv2apply (do not retry)
 _sem = asyncio.Semaphore(2)
 
 
@@ -39,7 +40,7 @@ def _read_wav(path):
     with open(path, "rb") as f:
         b = f.read()
     if b[:4] != b"RIFF" or b[8:12] != b"WAVE":
-        raise ValueError("WAV inválido")
+        raise ValueError("invalid WAV")
     pos, fmt, ch, bits, data = 12, None, 1, 32, None
     while pos + 8 <= len(b):
         cid, size = b[pos:pos + 4], struct.unpack("<I", b[pos + 4:pos + 8])[0]
@@ -53,7 +54,7 @@ def _read_wav(path):
             data = body
         pos += 8 + size + (size & 1)
     if data is None:
-        raise ValueError("WAV sem dados")
+        raise ValueError("WAV without data")
     if fmt == 3 and bits == 32:
         y = np.frombuffer(data, "<f4").astype(np.float64)
     elif fmt == 3 and bits == 64:
@@ -63,7 +64,7 @@ def _read_wav(path):
     elif fmt == 1 and bits == 32:
         y = np.frombuffer(data, "<i4") / 2147483648.0
     else:
-        raise ValueError(f"formato WAV não suportado ({fmt}/{bits})")
+        raise ValueError(f"unsupported WAV format ({fmt}/{bits})")
     return y.reshape(-1, ch)[:, 0]
 
 
@@ -73,13 +74,13 @@ def _key(uri, params):
 
 
 async def measure(uri: str, params: dict, channels: int = 1) -> list:
-    """Magnitude (dB) nos POINTS para o plugin com estes parâmetros.
+    """Magnitude (dB) at POINTS for the plugin with these parameters.
 
-    channels = n.º de entradas de áudio do plugin (o lv2apply exige o mesmo
-    n.º de canais no ficheiro)."""
+    channels = number of audio inputs of the plugin (lv2apply requires the
+    file to have the same number of channels)."""
     if "lsp-plug.in" in uri and "equalizer" in uri and "mode" in params:
-        # FIR/FFT/SPM do LSP têm a mesma magnitude do IIR (só muda a fase) e
-        # precisam de mais blocos para estabilizar: mede-se em IIR
+        # LSP FIR/FFT/SPM modes have the same magnitude as IIR (only the phase
+        # differs) and need more blocks to settle: measure in IIR
         params = dict(params, mode=0)
     k = _key(uri, params) + f":{channels}"
     if k in _cache:
@@ -101,7 +102,7 @@ async def measure(uri: str, params: dict, channels: int = 1) -> list:
             if p.returncode < 0 or p.returncode >= 128:
                 BROKEN.add(uri)
             if p.returncode != 0 or not os.path.exists(dst):
-                raise RuntimeError("lv2apply falhou: " + err.decode(errors="replace").strip()[-300:])
+                raise RuntimeError("lv2apply failed: " + err.decode(errors="replace").strip()[-300:])
             y = _read_wav(dst)
     H = np.abs(np.fft.rfft(y, N))
     freqs = np.fft.rfftfreq(N, 1 / SR)

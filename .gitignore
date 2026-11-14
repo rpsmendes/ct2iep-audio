@@ -1,7 +1,7 @@
-# configuração local (pode ter passwords)
+# local configuration (may contain passwords)
 .env
 
-# estado e presets locais da UI
+# local UI state, presets and plugins installed from the UI
 data/*
 !data/.gitkeep
 
@@ -9,5 +9,5 @@ data/*
 __pycache__/
 *.pyc
 
-# pacotes
+# archives
 *.tar.gz

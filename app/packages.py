@@ -1,13 +1,13 @@
-"""Pacotes de plugins LV2 instalados a pedido (sem recompilar a imagem).
+"""LV2 plugin packages installed on demand (without rebuilding the image).
 
-Um pacote Debian é descarregado (apt-get download), desempacotado, e só os
-bundles LV2 são copiados para /data/lv2, que é persistente e está no LV2_PATH
-do motor e da UI. Bibliotecas partilhadas que os plugins precisem e que não
-estejam na imagem vão para /data/lv2/.lib (no LD_LIBRARY_PATH). Cada pacote
-tem um manifesto em /data/lv2/.packages/<pacote>.json, para poder ser removido.
+A Debian package is downloaded (apt-get download) and unpacked, and only its
+LV2 bundles are copied to /data/lv2, which is persistent and is in the
+LV2_PATH of both the engine and the UI. Shared libraries the plugins need that
+are not in the image go to /data/lv2/.lib (in LD_LIBRARY_PATH). Each package
+has a manifest in /data/lv2/.packages/<package>.json so it can be removed.
 
-Depois de instalar/remover, o motor reinicia o mod-host (ficheiro .rescan)
-para ver os plugins novos; a cadeia é recarregada automaticamente.
+After installing/removing, the engine restarts mod-host (.rescan file) so it
+sees the new plugins; the chain is reloaded automatically.
 """
 import asyncio
 import glob
@@ -29,33 +29,33 @@ RESCAN = LV2_DIR / ".rescan"
 SYSTEM_LV2 = [Path("/usr/lib/lv2"), Path("/usr/local/lib/lv2")]
 SAFE_PKG = re.compile(r"^[a-z0-9][a-z0-9+.\-]{1,60}$")
 
-# Pacotes já incluídos na imagem
+# Packages already included in the image
 BASE = {"lsp-plugins-lv2", "calf-plugins", "x42-plugins", "dragonfly-reverb-lv2"}
 
-# Catálogo sugerido (orientado para voz/SSB). Qualquer outro pacote Debian
-# com plugins LV2 também pode ser instalado pelo nome.
+# Suggested catalog (aimed at voice/SSB). Any other Debian package with LV2
+# plugins can also be installed by name.
 CATALOG = [
     {"pkg": "lsp-plugins-lv2", "title": "LSP Plugins",
-     "desc": "EQs, compressores, gates, limiters, filtros (base da cadeia)."},
+     "desc": "EQs, compressors, gates, limiters, filters (the base of the chain)."},
     {"pkg": "calf-plugins", "title": "Calf Studio Gear",
      "desc": "Exciter, de-esser, saturator, bass enhancer, EQs, reverbs."},
     {"pkg": "x42-plugins", "title": "x42 (Robin Gareus)",
-     "desc": "fil4 EQ, dpl limiter, medidores, afinador, utilitários."},
+     "desc": "fil4 EQ, dpl limiter, meters, tuner, utilities."},
     {"pkg": "dragonfly-reverb-lv2", "title": "Dragonfly Reverb",
-     "desc": "Plate, room e hall reverb."},
+     "desc": "Plate, room and hall reverb."},
     {"pkg": "zam-plugins", "title": "ZAM Plugins",
-     "desc": "ZamComp, ZamGate, ZamEQ2, ZaMaximX2 (limiter), ZamAutoSat: dinâmica e EQ leves."},
+     "desc": "ZamComp, ZamGate, ZamEQ2, ZaMaximX2 (limiter), ZamAutoSat: lightweight dynamics and EQ."},
     {"pkg": "swh-lv2", "title": "SWH (Steve Harris)",
-     "desc": "Clássicos: SC4 compressor, Fast Lookahead Limiter, Dyson compressor, filtros."},
+     "desc": "Classics: SC4 compressor, Fast Lookahead Limiter, Dyson compressor, filters."},
     {"pkg": "mda-lv2", "title": "MDA",
-     "desc": "De-esser, Dynamics, Limiter, Combo, EQ e outros clássicos."},
+     "desc": "De-esser, Dynamics, Limiter, Combo, EQ and other classics."},
     {"pkg": "fomp", "title": "FOMP (Fons Adriaensen)",
-     "desc": "EQs paramétricos e filtros muito limpos (1/2/4 bandas, HP/LP)."},
+     "desc": "Very clean parametric EQs and filters (1/2/4 bands, HP/LP)."},
     {"pkg": "eq10q", "title": "EQ10Q",
-     "desc": "EQ paramétrico até 10 bandas, gate e compressor."},
+     "desc": "Parametric EQ with up to 10 bands, gate and compressor."},
     {"pkg": "invada-studio-plugins-lv2", "title": "Invada Studio",
-     "desc": "Compressor, filtros, tube distortion, delay."},
-    {"pkg": "abgate", "title": "abGate", "desc": "Noise gate simples."},
+     "desc": "Compressor, filters, tube distortion, delay."},
+    {"pkg": "abgate", "title": "abGate", "desc": "Simple noise gate."},
 ]
 
 _lock = asyncio.Lock()
@@ -84,7 +84,7 @@ async def _run(args, logl, cwd=None, check=True, timeout=300):
     tail = [ln for ln in text.splitlines() if ln.strip()][-6:]
     logl.extend("  " + ln for ln in tail)
     if check and p.returncode != 0:
-        raise PackageError(f"falhou: {' '.join(args[:3])}…", logl)
+        raise PackageError(f"failed: {' '.join(args[:3])}…", logl)
     return p.returncode, text
 
 
@@ -120,7 +120,7 @@ def _bundles_in(root):
 
 
 async def _missing_libs(paths, logl):
-    """Bibliotecas em falta nos .so dos plugins (ignora os .so da GUI)."""
+    """Missing libraries in the plugins' .so files (GUI .so files are ignored)."""
     missing = set()
     for so in paths:
         name = so.name.lower()
@@ -146,7 +146,7 @@ async def _depends(pkg, logl):
 
 
 async def status(used_uris=()):
-    import lv2meta  # evita import circular no arranque
+    import lv2meta  # avoids a circular import at startup
     installed = {m["pkg"]: m for m in _manifests()}
     in_use = {}
     for uri in used_uris:
@@ -161,7 +161,7 @@ async def status(used_uris=()):
     names = [c["pkg"] for c in CATALOG] + [p for p in installed if p not in {c["pkg"] for c in CATALOG}]
     by_name = {c["pkg"]: c for c in CATALOG}
     for pkg in names:
-        c = by_name.get(pkg, {"pkg": pkg, "title": pkg, "desc": "Instalado manualmente."})
+        c = by_name.get(pkg, {"pkg": pkg, "title": pkg, "desc": "Installed manually."})
         m = installed.get(pkg)
         state = "base" if pkg in BASE else ("installed" if m else "available")
         items.append({**c, "state": state, "version": m["version"] if m else None,
@@ -172,18 +172,18 @@ async def status(used_uris=()):
 
 async def install(pkg):
     if not SAFE_PKG.match(pkg):
-        raise PackageError("nome de pacote inválido")
+        raise PackageError("invalid package name")
     if pkg in BASE or await _dpkg_installed(pkg):
-        raise PackageError(f"{pkg} já está incluído na imagem")
+        raise PackageError(f"{pkg} is already included in the image")
     if _manifest(pkg):
-        raise PackageError(f"{pkg} já está instalado")
+        raise PackageError(f"{pkg} is already installed")
     async with _lock:
         logl = []
         await _ensure_lists(logl)
         _, pol = await _run(["apt-cache", "policy", pkg], logl, check=False)
         cand = re.search(r"Candidate:\s*(\S+)", pol)
         if not cand or cand.group(1) == "(none)":
-            raise PackageError(f"o pacote {pkg} não existe nesta versão do Debian", logl)
+            raise PackageError(f"package {pkg} does not exist in this Debian release", logl)
         version = cand.group(1)
         LV2_DIR.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=LV2_DIR, prefix=".tmp-") as tmp:
@@ -195,7 +195,7 @@ async def install(pkg):
                 await _run(["dpkg-deb", "-x", str(deb), str(x)], logl)
             bundles = _bundles_in(x)
             if not bundles:
-                raise PackageError(f"o pacote {pkg} não contém plugins LV2", logl)
+                raise PackageError(f"package {pkg} does not contain LV2 plugins", logl)
             copied, skipped = [], []
             for b in bundles:
                 if any((d / b.name).exists() for d in SYSTEM_LV2):
@@ -204,14 +204,14 @@ async def install(pkg):
                 dest = LV2_DIR / b.name
                 if dest.exists():
                     owner = next((m["pkg"] for m in _manifests() if b.name in m["bundles"]), None)
-                    raise PackageError(f"o bundle {b.name} já existe (pacote {owner or '?'})", logl)
+                    raise PackageError(f"bundle {b.name} already exists (package {owner or '?'})", logl)
                 shutil.copytree(b, dest, symlinks=True)
                 copied.append(b.name)
             if not copied:
-                raise PackageError("todos os plugins deste pacote já estão na imagem", logl)
-            logl.append(f"bundles instalados: {', '.join(copied)}")
+                raise PackageError("all plugins in this package are already in the image", logl)
+            logl.append(f"installed bundles: {', '.join(copied)}")
 
-            # bibliotecas partilhadas em falta: tenta resolver com as dependências diretas
+            # missing shared libraries: try to resolve them from the direct dependencies
             sos = [p for n in copied for p in (LV2_DIR / n).rglob("*.so")]
             missing = await _missing_libs(sos, logl)
             libs = []
@@ -219,7 +219,7 @@ async def install(pkg):
             rounds = 0
             while missing and todo and rounds < 3:
                 rounds += 1
-                logl.append(f"bibliotecas em falta: {', '.join(sorted(missing))}")
+                logl.append(f"missing libraries: {', '.join(sorted(missing))}")
                 nxt = []
                 for parent in todo:
                     for dep in await _depends(parent, logl):
@@ -247,24 +247,24 @@ async def install(pkg):
                 todo = nxt
                 missing = await _missing_libs(sos, logl)
             if missing:
-                logl.append(f"AVISO: continuam em falta: {', '.join(sorted(missing))}")
+                logl.append(f"WARNING: still missing: {', '.join(sorted(missing))}")
         MANIFESTS.mkdir(parents=True, exist_ok=True)
         manifest = {"pkg": pkg, "version": version, "bundles": copied, "skipped": skipped,
                     "libs": libs, "missing_libs": sorted(missing), "installed_at": int(time.time())}
         (MANIFESTS / f"{pkg}.json").write_text(json.dumps(manifest, indent=1))
-        log.info("pacote %s %s instalado: %s", pkg, version, copied)
+        log.info("package %s %s installed: %s", pkg, version, copied)
         return {"ok": True, "manifest": manifest, "log": logl}
 
 
 async def remove(pkg, used_uris=()):
     if not SAFE_PKG.match(pkg):
-        raise PackageError("nome de pacote inválido")
+        raise PackageError("invalid package name")
     m = _manifest(pkg)
     if not m:
-        raise PackageError(f"{pkg} não foi instalado por aqui" + (" (está na imagem base)" if pkg in BASE else ""))
+        raise PackageError(f"{pkg} was not installed from here" + (" (it is part of the base image)" if pkg in BASE else ""))
     st = await status(used_uris)
     if any(p["pkg"] == pkg and p["in_use"] for p in st["packages"]):
-        raise PackageError(f"há blocos na cadeia que usam plugins de {pkg}: remove-os primeiro")
+        raise PackageError(f"blocks in the chain use plugins from {pkg}: remove them first")
     async with _lock:
         for b in m["bundles"]:
             shutil.rmtree(LV2_DIR / b, ignore_errors=True)
@@ -276,8 +276,8 @@ async def remove(pkg, used_uris=()):
                 except FileNotFoundError:
                     pass
         (MANIFESTS / f"{pkg}.json").unlink()
-        log.info("pacote %s removido", pkg)
-        return {"ok": True, "log": [f"removidos: {', '.join(m['bundles'])}"]}
+        log.info("package %s removed", pkg)
+        return {"ok": True, "log": [f"removed: {', '.join(m['bundles'])}"]}
 
 
 def request_rescan():

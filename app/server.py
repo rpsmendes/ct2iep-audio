@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""CT2IEP - controlo web da cadeia de áudio TX.
+"""CT2IEP - web control for the TX audio chain.
 
-Fala com o mod-host (motor LV2 sobre JACK) por TCP, lê os metadados dos
-plugins com lilv para gerar a UI, guarda estado/presets em JSON e controla
-o mixer ALSA das placas com amixer.
+Talks to mod-host (LV2 host on JACK) over TCP, reads plugin metadata with
+lilv to build the UI, stores state/presets as JSON and drives the ALSA mixer
+of the sound cards with amixer.
 
-A cadeia é uma lista ordenada de blocos guardada em data/state.json.
-O config/chain.yaml define a "cadeia de fábrica" (estado inicial e reposição)
-e a apresentação dos blocos conhecidos (parâmetros principais, medidores).
+The chain is an ordered list of blocks stored in data/state.json.
+config/chain.yaml defines the "factory chain" (initial state and reset) and
+how known blocks are presented (main parameters, meters).
 """
 import asyncio
 import base64
@@ -44,7 +44,7 @@ STATE_VERSION = 2
 
 
 def parse_value(v):
-    """Aceita números ou strings '-12dB' (convertidas para coeficiente linear)."""
+    """Accepts numbers or strings such as '-12dB' (converted to a linear coefficient)."""
     if isinstance(v, str):
         s = v.strip()
         if s.lower().endswith("db"):
@@ -56,11 +56,11 @@ def parse_value(v):
 def slugify(text):
     t = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
     t = re.sub(r"[^a-z0-9]+", "-", t).strip("-")
-    return (t or "bloco")[:24].strip("-")
+    return (t or "block")[:24].strip("-")
 
 
 # ----------------------------------------------------------------------------
-# Cadeia de fábrica (chain.yaml)
+# Factory chain (chain.yaml)
 # ----------------------------------------------------------------------------
 class Factory:
     def __init__(self, path: Path):
@@ -91,7 +91,7 @@ class Factory:
 
 
 # ----------------------------------------------------------------------------
-# Estado
+# State
 # ----------------------------------------------------------------------------
 def plugin_available(uri):
     try:
@@ -113,7 +113,7 @@ def defaults_for(app, block):
 
 
 def normalize_block(app, b):
-    """Garante parâmetros válidos (desconhecidos fora, em falta com o valor por defeito)."""
+    """Ensures valid parameters (unknown ones dropped, missing ones set to the default)."""
     out = {"id": str(b["id"]), "uri": str(b["uri"]), "bypass": bool(b.get("bypass", False)),
            "params": {}}
     if b.get("name"):
@@ -132,7 +132,7 @@ def normalize_block(app, b):
 
 
 def migrate_v1(app, saved):
-    """Estado/preset antigo (blocos por id, ordem fixa do chain.yaml) -> v2."""
+    """Old state/preset (blocks keyed by id, fixed chain.yaml order) -> v2."""
     blocks = app["factory"].blocks()
     old = saved.get("blocks") or {}
     for b in blocks:
@@ -163,7 +163,7 @@ def find_block(app, bid):
     for b in app["rt"]["state"]["blocks"]:
         if b["id"] == bid:
             return b
-    raise KeyError(f"bloco desconhecido: {bid}")
+    raise KeyError(f"unknown block: {bid}")
 
 
 def control_of(block, sym):
@@ -193,7 +193,7 @@ def unique_id(app, base):
 
 
 # ----------------------------------------------------------------------------
-# Vista para a UI
+# View for the UI
 # ----------------------------------------------------------------------------
 def resolve_meters(meta, specs):
     out = []
@@ -246,7 +246,7 @@ def chain_view(app):
 
 
 # ----------------------------------------------------------------------------
-# Motor (mod-host)
+# Engine (mod-host)
 # ----------------------------------------------------------------------------
 class Engine:
     def __init__(self, app):
@@ -254,16 +254,16 @@ class Engine:
         self.reader = self.writer = None
         self.lock = asyncio.Lock()
         self.online = False
-        self.inst = {}            # id do bloco -> instância no mod-host
+        self.inst = {}            # block id -> mod-host instance
         self.next_inst = 0
-        self.links = set()        # ligações JACK feitas por nós
-        self.errors = {}          # id do bloco -> erro ao carregar
+        self.links = set()        # JACK connections we made
+        self.errors = {}          # block id -> load error
         self.meter_values = {}
 
     async def cmd(self, line: str, quiet=False) -> str:
         async with self.lock:
             if not self.writer:
-                raise ConnectionError("mod-host desligado")
+                raise ConnectionError("mod-host not connected")
             self.writer.write(line.encode() + b"\0")
             await self.writer.drain()
             data = await asyncio.wait_for(self.reader.readuntil(b"\0"), 10)
@@ -278,13 +278,13 @@ class Engine:
     async def load_block(self, b):
         self.errors.pop(b["id"], None)
         if not plugin_available(b["uri"]):
-            self.errors[b["id"]] = "plugin não instalado"
+            self.errors[b["id"]] = "plugin not installed"
             return False
         i = self.next_inst
         self.next_inst += 1
         r = await self.cmd(f'add "{b["uri"]}" {i}')
         if r.startswith("resp -"):
-            self.errors[b["id"]] = f"o mod-host recusou o plugin ({r[5:]})"
+            self.errors[b["id"]] = f"mod-host refused the plugin ({r[5:]})"
             return False
         self.inst[b["id"]] = i
         for s, v in b["params"].items():
@@ -326,7 +326,7 @@ class Engine:
         return links
 
     async def rewire(self):
-        """Aplica só as diferenças: primeiro desliga (silêncio breve), depois liga."""
+        """Applies only the differences: disconnect first (brief silence), then connect."""
         new = self.desired_links()
         for a, b in sorted(self.links - new):
             await self.cmd(f'disconnect "{a}" "{b}"', quiet=True)
@@ -341,7 +341,7 @@ class Engine:
             await self.load_block(b)
         await self.rewire()
         await self.cmd("output_data_ready")
-        log.info("cadeia carregada (%d blocos)", len(self.inst))
+        log.info("chain loaded (%d blocks)", len(self.inst))
 
     async def feedback(self, r):
         while True:
@@ -357,8 +357,8 @@ class Engine:
         while True:
             fb_writer = fb_task = None
             try:
-                # o mod-host só começa a processar comandos depois de aceitar
-                # as duas ligações (comandos e feedback), por esta ordem
+                # mod-host only starts processing commands after it has accepted
+                # both connections (commands and feedback), in this order
                 self.reader, self.writer = await asyncio.open_connection(MODHOST_HOST, MODHOST_PORT)
                 fb_reader, fb_writer = await asyncio.open_connection(MODHOST_HOST, FEEDBACK_PORT)
                 fb_task = asyncio.create_task(self.feedback(fb_reader))
@@ -366,14 +366,14 @@ class Engine:
                     await self.build()
                 self.online = True
                 await broadcast(self.app, {"type": "chain", "chain": chain_view(self.app)})
-                await fb_task                  # fica aqui até a ligação cair
+                await fb_task                  # stays here until the connection drops
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001
                 if self.online:
-                    log.warning("ligação ao mod-host perdida: %r", e)
+                    log.warning("lost connection to mod-host: %r", e)
                 else:
-                    log.info("à espera do mod-host em %s:%d (%r)", MODHOST_HOST, MODHOST_PORT, e)
+                    log.info("waiting for mod-host at %s:%d (%r)", MODHOST_HOST, MODHOST_PORT, e)
             finally:
                 if fb_task:
                     fb_task.cancel()
@@ -389,7 +389,7 @@ class Engine:
 
 
 # ----------------------------------------------------------------------------
-# Operações sobre a cadeia
+# Chain operations
 # ----------------------------------------------------------------------------
 def save_state(app):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -447,7 +447,7 @@ async def op_move(app, order):
         st = app["rt"]["state"]
         cur = {b["id"]: b for b in st["blocks"]}
         if sorted(order) != sorted(cur):
-            raise ValueError("a nova ordem não tem os mesmos blocos")
+            raise ValueError("the new order does not contain the same blocks")
         st["blocks"] = [cur[i] for i in order]
         if app["engine"].online:
             await app["engine"].rewire()
@@ -456,7 +456,7 @@ async def op_move(app, order):
 
 async def op_add(app, uri, at=None):
     async with app["rt"]["oplock"]:
-        meta = lv2meta.describe(uri)          # KeyError se não existir
+        meta = lv2meta.describe(uri)          # KeyError if it does not exist
         st = app["rt"]["state"]
         b = {"id": unique_id(app, slugify(meta["name"])), "uri": uri, "bypass": False,
              "name": meta["name"], "params": {}}
@@ -486,7 +486,7 @@ async def op_remove(app, bid):
 
 
 async def op_apply_state(app, new_state):
-    """Aplica um estado completo (preset, reposição). Só recarrega os plugins que mudam."""
+    """Applies a full state (preset, reset). Only reloads the plugins that change."""
     async with app["rt"]["oplock"]:
         new = normalize_state(app, new_state)
         eng: Engine = app["engine"]
@@ -536,14 +536,14 @@ async def meter_ticker(app):
 
 
 # ----------------------------------------------------------------------------
-# Placas de áudio (aplay/arecord/amixer)
+# Sound cards (aplay/arecord/amixer)
 # ----------------------------------------------------------------------------
 async def run_cmd(*args, env=None):
     p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE,
                                              stderr=asyncio.subprocess.PIPE, env=env)
     out, err = await p.communicate()
     if p.returncode != 0:
-        raise RuntimeError(err.decode().strip() or f"{args[0]} falhou")
+        raise RuntimeError(err.decode().strip() or f"{args[0]} failed")
     return out.decode()
 
 
@@ -551,7 +551,7 @@ CARD_LINE = re.compile(r"^card (\d+): (\S+) \[(.*?)\], device (\d+): (.*?) \[(.*
 
 
 async def list_cards():
-    """Placas via aplay -l / arecord -l (o Docker esconde /proc/asound)."""
+    """Cards via aplay -l / arecord -l (Docker hides /proc/asound)."""
     cards = {}
     raw = []
     for tool, kind in (("aplay", "playback"), ("arecord", "capture")):
@@ -604,7 +604,7 @@ def parse_scontents(text):
                 seg = ln[i:]
                 j = seg.find(other)
                 if j > 0:
-                    seg = seg[:j]               # linha com Playback e Capture juntos
+                    seg = seg[:j]               # line with both Playback and Capture
                 p = re.search(r"\[(\d+)%\]", seg)
                 sw_m = re.search(r"\[(on|off)\]", seg)
                 d = re.search(r"\[(-?[\d.]+dB)\]", seg)
@@ -625,7 +625,7 @@ SAFE_CARD = re.compile(r"^[\w\-]{1,32}$")
 def card_param(request, body=None):
     card = (body or {}).get("card") or request.query.get("card") or MIXER_CARD
     if card and not SAFE_CARD.match(str(card)):
-        raise web.HTTPBadRequest(text="placa inválida")
+        raise web.HTTPBadRequest(text="invalid card")
     return str(card)
 
 
@@ -691,7 +691,7 @@ async def h_remove(request):
 
 
 async def h_reset(request):
-    """Repõe os valores de um bloco, ou a cadeia de fábrica inteira."""
+    """Resets one block's values, or the whole factory chain."""
     app = request.app
     bid = request.query.get("block")
     st = copy.deepcopy(app["rt"]["state"])
@@ -708,7 +708,7 @@ async def h_reset(request):
 
 
 async def h_response(request):
-    """Curva do bloco (medida com o plugin real) e curva total dos blocos com gráfico."""
+    """Block curve (measured with the real plugin) and combined curve of all graphable blocks."""
     app = request.app
     try:
         target = find_block(app, request.query["block"])
@@ -717,7 +717,7 @@ async def h_response(request):
     st = app["rt"]["state"]
     views = {b["id"]: block_view(app, b) for b in st["blocks"]}
     if not views[target["id"]]["graph"]:
-        return err("este bloco não tem gráfico")
+        return err("this block has no graph")
     parts = [b for b in st["blocks"] if views[b["id"]]["graph"] and not b["bypass"]
              and not views[b["id"]]["missing"]]
 
@@ -727,8 +727,8 @@ async def h_response(request):
     try:
         curve = await response.measure(target["uri"], target["params"], chans(target))
     except Exception as e:  # noqa: BLE001
-        log.warning("resposta em frequência de %s: %s", target["id"], e)
-        return err(f"não foi possível calcular a curva: {e}", 500)
+        log.warning("frequency response of %s: %s", target["id"], e)
+        return err(f"could not compute the curve: {e}", 500)
     total, used = None, []
     if not st["chain_bypass"] and parts:
         res = await asyncio.gather(*(response.measure(b["uri"], b["params"], chans(b)) for b in parts),
@@ -756,7 +756,7 @@ async def h_preset_save(request):
     body = await request.json()
     name = str(body.get("name", "")).strip()
     if not SAFE_NAME.match(name):
-        return err("nome inválido")
+        return err("invalid name")
     (presets_dir() / f"{name}.json").write_text(json.dumps(request.app["rt"]["state"], indent=1))
     return web.json_response({"ok": True})
 
@@ -765,7 +765,7 @@ async def h_preset_load(request):
     name = request.match_info["name"]
     f = presets_dir() / f"{name}.json"
     if not SAFE_NAME.match(name) or not f.exists():
-        return err("preset não existe", 404)
+        return err("preset does not exist", 404)
     await op_apply_state(request.app, json.loads(f.read_text()))
     return web.json_response({"ok": True})
 
@@ -820,7 +820,7 @@ async def h_packages(request):
 
 async def after_packages_change(app):
     await asyncio.get_running_loop().run_in_executor(None, lv2meta.reload)
-    packages.request_rescan()           # o motor reinicia o mod-host e a cadeia é recarregada
+    packages.request_rescan()           # the engine restarts mod-host and the chain is reloaded
     await chain_changed(app)
 
 
@@ -872,7 +872,7 @@ async def h_ws(request):
                     schedule_save(app)
                     await broadcast(app, m, exclude=ws)
             except Exception as e:  # noqa: BLE001
-                log.warning("mensagem ws inválida: %s (%s)", msg.data[:200], e)
+                log.warning("invalid ws message: %s (%s)", msg.data[:200], e)
                 await ws.send_str(json.dumps({"type": "error", "message": str(e)}))
     finally:
         app["sockets"].discard(ws)
@@ -883,7 +883,7 @@ async def on_startup(app):
     loop = asyncio.get_running_loop()
     app["tasks"] = [asyncio.create_task(app["engine"].run()),
                     asyncio.create_task(meter_ticker(app))]
-    loop.run_in_executor(None, lv2meta.library)      # pré-carrega a biblioteca
+    loop.run_in_executor(None, lv2meta.library)      # preload the library
 
 
 async def on_shutdown(app):
@@ -905,7 +905,7 @@ def make_app():
         try:
             saved = json.loads(sf.read_text())
         except ValueError:
-            log.warning("state.json inválido, a usar a cadeia de fábrica")
+            log.warning("invalid state.json, using the factory chain")
     app["rt"] = {"oplock": asyncio.Lock()}
     app["rt"]["state"] = normalize_state(app, saved)
     app["sockets"] = set()

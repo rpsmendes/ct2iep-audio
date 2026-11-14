@@ -18,15 +18,15 @@ services:
     group_add:
       - audio
     cap_add:
-      - SYS_NICE          # prioridade em tempo real para o jackd
+      - SYS_NICE          # real-time priority for jackd
     ulimits:
       rtprio: 95
       memlock: -1
     shm_size: 256m
     volumes:
-      - ./data/lv2:/data/lv2:ro   # plugins instalados a pedido pela UI
+      - ./data/lv2:/data/lv2:ro   # plugins installed on demand from the UI
     expose:
-      - "5555"            # comandos mod-host (só na rede interna do compose)
+      - "5555"            # mod-host commands (compose internal network only)
       - "5556"            # feedback (meters)
 
   web:
@@ -42,7 +42,7 @@ services:
     depends_on:
       - engine
     devices:
-      - /dev/snd:/dev/snd # para o mixer ALSA (ganhos da placa)
+      - /dev/snd:/dev/snd # for the ALSA mixer and card list
     group_add:
       - audio
     volumes:

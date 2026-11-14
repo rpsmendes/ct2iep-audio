@@ -1,8 +1,8 @@
-"""Metadados LV2 (lilv): descrição de plugins, biblioteca e recarregamento.
+"""LV2 metadata (lilv): plugin descriptions, library and reloading.
 
-O mundo lilv pode ser recarregado (depois de instalar/remover pacotes de
-plugins), por isso tudo passa por funções deste módulo em vez de um global
-importado diretamente.
+The lilv world can be reloaded (after installing/removing plugin packages),
+so everything goes through functions in this module instead of a directly
+imported global.
 """
 import logging
 import os
@@ -13,13 +13,13 @@ import lilv
 
 log = logging.getLogger("audio-web")
 
-# Portas de controlo que só servem a GUI nativa dos plugins (escondidas na UI)
+# Control ports that only serve the plugins' native GUI (hidden in the UI)
 HIDDEN = re.compile(
     r"^(enabled|bypass|pause|clear|zoom|react|shift|fsel|ife|ofe|frqs|listen|sc_listen"
     r"|insp_.*|hue_\d+|xs_\d+|xm_\d+|slv|elv|grv|ilv|olv|clv|igv|ogv|scgv|grgv)$"
 )
 
-# Classes LV2 com resposta linear em frequência (mostram gráfico)
+# LV2 classes with a linear frequency response (they get a graph)
 GRAPH_CLASSES = {
     "http://lv2plug.in/ns/lv2core#EQPlugin",
     "http://lv2plug.in/ns/lv2core#ParaEQPlugin",
@@ -31,7 +31,7 @@ GRAPH_CLASSES = {
     "http://lv2plug.in/ns/lv2core#AllpassPlugin",
 }
 
-# Medidores reconhecidos automaticamente em blocos adicionados pela UI
+# Meters recognised automatically in blocks added from the UI
 AUTO_METERS = [("grlm", "gr"), ("rlm", "gr"), ("compression", "gr")]
 
 _lock = threading.RLock()
@@ -51,7 +51,7 @@ def _f(node, fallback=0.0):
 
 
 def reload():
-    """(Re)carrega todos os bundles LV2 do LV2_PATH."""
+    """(Re)loads every LV2 bundle in LV2_PATH."""
     global _world, _N, _library_cache
     with _lock:
         w = lilv.World()
@@ -74,7 +74,7 @@ def reload():
         _world = w
         _desc_cache.clear()
         _library_cache = None
-        log.info("LV2: %d plugins carregados", len(w.get_all_plugins()))
+        log.info("LV2: %d plugins loaded", len(w.get_all_plugins()))
 
 
 def _plugin(uri):
@@ -82,12 +82,12 @@ def _plugin(uri):
         reload()
     p = _world.get_all_plugins()[_world.new_uri(uri)]
     if p is None:
-        raise KeyError(f"plugin LV2 não encontrado: {uri}")
+        raise KeyError(f"LV2 plugin not found: {uri}")
     return p
 
 
 def _class_chain(plugin):
-    """URIs da classe do plugin e das classes-mãe."""
+    """URIs of the plugin class and its parent classes."""
     out = []
     classes = _world.get_plugin_classes()
     cls = plugin.get_class()
@@ -107,7 +107,7 @@ def _class_chain(plugin):
 
 
 def describe(uri: str) -> dict:
-    """Portas e metadados de um plugin (com cache)."""
+    """Ports and metadata of a plugin (cached)."""
     with _lock:
         if uri in _desc_cache:
             return _desc_cache[uri]
@@ -130,7 +130,7 @@ def describe(uri: str) -> dict:
                     d["audio_in"].append(sym)
                 continue
             if not p.is_a(_N["control"]):
-                # portas atom/event/CV obrigatórias: o lv2apply não as suporta
+                # mandatory atom/event/CV ports: lv2apply does not support them
                 if not p.has_property(_N["optional"]):
                     d["measurable"] = False
                 continue
@@ -173,7 +173,7 @@ def auto_meters(meta: dict) -> list:
 
 
 def library() -> list:
-    """Plugins utilizáveis numa cadeia de áudio (≥1 entrada e ≥1 saída de áudio)."""
+    """Plugins usable in an audio chain (≥1 audio input and ≥1 audio output)."""
     global _library_cache
     with _lock:
         if _library_cache is not None:
@@ -210,7 +210,7 @@ def library() -> list:
                     "extra": bundle.startswith(extra_root),
                 })
             except Exception as e:  # noqa: BLE001
-                log.debug("biblioteca: ignorado %s (%s)", plugin.get_uri(), e)
+                log.debug("library: skipped %s (%s)", plugin.get_uri(), e)
         out.sort(key=lambda x: (x["name"].lower(), x["uri"]))
         _library_cache = out
         return out
