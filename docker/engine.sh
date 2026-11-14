@@ -1,6 +1,8 @@
 #!/bin/sh
 # Motor de áudio: jackd (placa principal) + pontes zita opcionais + mod-host.
-# Se algum processo morrer, o contentor termina e o Docker reinicia-o.
+# Se o jackd ou uma ponte morrer, o contentor termina e o Docker reinicia-o.
+# Quando a UI instala/remove pacotes de plugins, escreve /data/lv2/.rescan:
+# o mod-host é reiniciado (o JACK continua) para carregar os plugins novos.
 set -eu
 
 : "${AUDIO_CARD:?Define AUDIO_CARD no .env (ver 'aplay -l' no host)}"
@@ -9,6 +11,7 @@ PERIOD="${PERIOD:-128}"
 NPERIODS="${NPERIODS:-2}"
 JACK_PRIO="${JACK_PRIO:-80}"
 JACK_EXTRA="${JACK_EXTRA:-}"
+RESCAN_FILE="${RESCAN_FILE:-/data/lv2/.rescan}"
 
 echo "[engine] jackd em hw:${AUDIO_CARD} ${RATE} Hz, ${PERIOD}x${NPERIODS}"
 # shellcheck disable=SC2086
@@ -42,14 +45,29 @@ if [ -n "${FTDX_CARD:-}" ]; then
     esac
 fi
 
-mod-host -n -p 5555 -f 5556 &
-PIDS="$PIDS $!"
-echo "[engine] mod-host a escutar em 5555/5556"
+start_modhost() {
+    mod-host -n -p 5555 -f 5556 &
+    MH_PID=$!
+    echo "[engine] mod-host a escutar em 5555/5556"
+}
 
-# terminar se qualquer processo morrer
+mtime() { stat -c %Y "$1" 2>/dev/null || echo 0; }
+
+start_modhost
+LAST_RESCAN=$(mtime "$RESCAN_FILE")
+
 while :; do
     for p in $PIDS; do
-        kill -0 "$p" 2>/dev/null || { echo "[engine] processo $p terminou"; kill $PIDS 2>/dev/null || true; exit 1; }
+        kill -0 "$p" 2>/dev/null || { echo "[engine] processo $p terminou"; kill $PIDS $MH_PID 2>/dev/null || true; exit 1; }
     done
+    kill -0 "$MH_PID" 2>/dev/null || { echo "[engine] mod-host terminou"; kill $PIDS 2>/dev/null || true; exit 1; }
+    NOW=$(mtime "$RESCAN_FILE")
+    if [ "$NOW" != "$LAST_RESCAN" ]; then
+        LAST_RESCAN=$NOW
+        echo "[engine] plugins alterados: a reiniciar o mod-host"
+        kill "$MH_PID" 2>/dev/null || true
+        wait "$MH_PID" 2>/dev/null || true
+        start_modhost
+    fi
     sleep 2
 done

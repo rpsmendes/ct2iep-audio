@@ -23,6 +23,8 @@ services:
       rtprio: 95
       memlock: -1
     shm_size: 256m
+    volumes:
+      - ./data/lv2:/data/lv2:ro   # plugins instalados a pedido pela UI
     expose:
       - "5555"            # comandos mod-host (só na rede interna do compose)
       - "5556"            # feedback (meters)

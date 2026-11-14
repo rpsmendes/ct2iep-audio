@@ -69,7 +69,7 @@ function handle(m) {
       break;
     case "bypass": STATE.blocks[m.block].bypass = m.value; renderStrip(); if (selected === m.block) renderPanel(); break;
     case "chain_bypass": STATE.chain_bypass = m.value; renderStrip(); break;
-    case "state": STATE = m.state; renderStrip(); renderPanel(); break;
+    case "chain": applyChain(m.chain); break;
     case "meters": updateMeters(m.values); break;
     case "error": toast("Erro: " + m.message); break;
   }
@@ -77,13 +77,18 @@ function handle(m) {
 function setStatus(on, text) { $("#dot").classList.toggle("on", !!on); $("#statusText").textContent = text; }
 
 // ---------- carregar ----------
-async function loadChain() {
-  const r = await fetch("/api/chain"); CHAIN = await r.json(); STATE = CHAIN.state;
+// a API devolve os blocos já com params/bypass; STATE é a vista usada pela UI
+function applyChain(v) {
+  CHAIN = v;
+  STATE = { chain_bypass: v.chain_bypass,
+            blocks: Object.fromEntries(v.blocks.map(b => [b.id, { bypass: b.bypass, params: b.params }])) };
   if (!selected || !CHAIN.blocks.find(b => b.id === selected)) selected = CHAIN.blocks[0]?.id;
   setStatus(CHAIN.online, CHAIN.online ? "motor ativo" : "motor de áudio parado");
-  renderMeters(); renderStrip(); renderPanel(); loadPresets();
+  renderMeters(); renderStrip(); renderPanel();
 }
-
+async function loadChain() {
+  const r = await fetch("/api/chain"); applyChain(await r.json()); loadPresets();
+}
 // ---------- strip ----------
 function renderStrip() {
   const s = $("#strip"); s.innerHTML = "";
@@ -254,7 +259,7 @@ async function loadMixer() {
     }
     m.append(box);
   }
-  $("#cards").textContent = await (await fetch("/api/cards")).text();
+  $("#cards").textContent = (await (await fetch("/api/cards")).json()).raw;
 }
 $("#mixerRefresh").onclick = loadMixer;
 
