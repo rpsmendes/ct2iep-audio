@@ -26,12 +26,14 @@
         <button id="presetLoad">Carregar</button>
         <button id="presetSave">Guardar como…</button>
         <button id="presetDel" class="ghost">Apagar</button>
+        <button id="factoryReset" class="ghost" title="Volta à cadeia do config/chain.yaml (ordem, blocos e valores)">Cadeia de fábrica</button>
       </div>
     </div>
 
     <div id="meters" class="meters"></div>
 
     <div id="strip" class="strip"></div>
+    <p class="hint">Arrasta a pega <span class="kbd">⋮⋮</span> de um bloco para mudar a ordem. O botão ⏻ liga/desliga o bloco.</p>
 
     <div id="panel" class="panel"></div>
   </section>
@@ -48,5 +50,6 @@
 
 <div id="toast" class="toast" hidden></div>
 <script src="/static/app.js"></script>
+<script src="/static/chain-edit.js"></script>
 </body>
 </html>
