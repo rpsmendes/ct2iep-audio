@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   documentation) is now written in English.
 
 ### Fixed
+- Repeated XRuns at startup and while the EQ graph refreshes: the web
+  service no longer competes with the real-time audio engine for CPU. It runs
+  at a lower priority (`WEB_NICE`, default 10), `lv2apply` runs at the lowest
+  priority and only loads the measured plugin's bundle, one measurement at a
+  time, and the plugin library is no longer scanned at startup (only when the
+  **+** library is first opened).
 - Plugins installed from the UI now live in `data/lv2/bundles` (libraries in
   `data/lv2/lib`, manifests in `data/lv2/packages`). Previously lilv also
   scanned the bookkeeping directories inside `data/lv2` and filled the log with

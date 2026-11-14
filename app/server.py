@@ -724,14 +724,17 @@ async def h_response(request):
     def chans(b):
         return max(1, len(lv2meta.describe(b["uri"])["audio_in"]))
 
+    def bundle(b):
+        return lv2meta.bundle_dirs_of(b["uri"])
+
     try:
-        curve = await response.measure(target["uri"], target["params"], chans(target))
+        curve = await response.measure(target["uri"], target["params"], chans(target), bundle(target))
     except Exception as e:  # noqa: BLE001
         log.warning("frequency response of %s: %s", target["id"], e)
         return err(f"could not compute the curve: {e}", 500)
     total, used = None, []
     if not st["chain_bypass"] and parts:
-        res = await asyncio.gather(*(response.measure(b["uri"], b["params"], chans(b)) for b in parts),
+        res = await asyncio.gather(*(response.measure(b["uri"], b["params"], chans(b), bundle(b)) for b in parts),
                                    return_exceptions=True)
         ok = [(b, c) for b, c in zip(parts, res) if not isinstance(c, Exception)]
         if ok:
@@ -880,10 +883,11 @@ async def h_ws(request):
 
 
 async def on_startup(app):
-    loop = asyncio.get_running_loop()
+    # The plugin library is built lazily on the first /api/library request:
+    # scanning ~300 plugins takes a couple of CPU seconds and must not compete
+    # with mod-host while it loads the chain at startup.
     app["tasks"] = [asyncio.create_task(app["engine"].run()),
                     asyncio.create_task(meter_ticker(app))]
-    loop.run_in_executor(None, lv2meta.library)      # preload the library
 
 
 async def on_shutdown(app):
@@ -938,4 +942,11 @@ def make_app():
 
 
 if __name__ == "__main__":
+    # The web UI, the EQ graph (lv2apply) and package installs must never take
+    # CPU time away from the real-time audio engine: run them all at a lower
+    # priority (children inherit it).
+    try:
+        os.nice(int(os.environ.get("WEB_NICE", "10")))
+    except (OSError, ValueError) as e:
+        log.warning("could not lower the web process priority: %s", e)
     web.run_app(make_app(), host="0.0.0.0", port=HTTP_PORT, access_log=None, shutdown_timeout=2)

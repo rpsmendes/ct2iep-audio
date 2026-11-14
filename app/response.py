@@ -24,7 +24,7 @@ N = 32768                     # ~0.7 s: covers the latency of the LSP FIR/FFT mo
 POINTS = np.geomspace(20, 20000, 240)
 _cache = OrderedDict()
 BROKEN = set()                # plugins that crashed lv2apply (do not retry)
-_sem = asyncio.Semaphore(2)
+_sem = asyncio.Semaphore(1)
 
 
 def _write_wav_f32(path, x, channels=1):
@@ -73,11 +73,13 @@ def _key(uri, params):
     return hashlib.sha1(raw.encode()).hexdigest()
 
 
-async def measure(uri: str, params: dict, channels: int = 1) -> list:
+async def measure(uri: str, params: dict, channels: int = 1, bundle: str = "") -> list:
     """Magnitude (dB) at POINTS for the plugin with these parameters.
 
     channels = number of audio inputs of the plugin (lv2apply requires the
-    file to have the same number of channels)."""
+    file to have the same number of channels).
+    bundle = the plugin's bundle directory: lv2apply then only loads that
+    bundle instead of scanning every installed plugin."""
     if "lsp-plug.in" in uri and "equalizer" in uri and "mode" in params:
         # LSP FIR/FFT/SPM modes have the same magnitude as IIR (only the phase
         # differs) and need more blocks to settle: measure in IIR
@@ -92,12 +94,19 @@ async def measure(uri: str, params: dict, channels: int = 1) -> list:
             x = np.zeros(N, dtype=np.float32)
             x[0] = 1.0
             _write_wav_f32(src, x, channels)
-            args = ["lv2apply", "-i", src, "-o", dst]
+            env = None
+            if bundle:
+                lv2dir = os.path.join(d, "lv2")
+                os.mkdir(lv2dir)
+                os.symlink(bundle.rstrip("/"), os.path.join(lv2dir, os.path.basename(bundle.rstrip("/"))))
+                env = dict(os.environ, LV2_PATH=lv2dir)
+            # lowest CPU priority: never compete with the audio engine
+            args = ["nice", "-n", "19", "lv2apply", "-i", src, "-o", dst]
             for s, v in params.items():
                 args += ["-c", s, f"{float(v):.9g}"]
             args.append(uri)
             p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.DEVNULL,
-                                                     stderr=asyncio.subprocess.PIPE)
+                                                     stderr=asyncio.subprocess.PIPE, env=env)
             _, err = await asyncio.wait_for(p.communicate(), 15)
             if p.returncode < 0 or p.returncode >= 128:
                 BROKEN.add(uri)
