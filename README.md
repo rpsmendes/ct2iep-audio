@@ -1,58 +1,63 @@
 # ct2iep-audio
 SSB transmit audio processing chain on a headless Debian mini PC: LV2 plugins on JACK/mod-host, web UI, Docker Compose. Built for a Yaesu FTDX-101D (CT2IEP).
 
-Cadeia de áudio TX para o FTDX-101D, equivalente à cadeia usada no Waveform, a correr
-num servidor Linux sem ambiente gráfico e controlada pelo browser na rede local.
+TX audio chain for the FTDX-101D, equivalent to the chain previously used in
+Waveform, running on a Linux server without a desktop and controlled from a
+browser on the local network.
 
 ```
- Microfone ─► placa externa (entrada) ─► JACK ─► [cadeia LV2 no mod-host] ─► placa externa (saída) ─► FTDX-101D
-                                                                         └► (opcional) USB do FTDX via zita-j2a
- Browser (LAN) ◄──► UI web :8080 ◄──► mod-host (comandos/medidores)
+ Microphone ─► external card (input) ─► JACK ─► [LV2 chain in mod-host] ─► external card (output) ─► FTDX-101D
+                                                                       └► (optional) FTDX USB via zita-j2a
+ Browser (LAN) ◄──► web UI :8080 ◄──► mod-host (commands/meters)
 ```
 
-Tudo corre em Docker Compose. No Debian só ficam o kernel/ALSA e o Docker.
+Everything runs in Docker Compose. The Debian host only needs the kernel/ALSA
+and Docker.
+
+See [CHANGELOG.md](CHANGELOG.md) for the history of changes.
 
 ---
 
-## 1. Plugins e ferramentas (dentro da imagem)
+## 1. Plugins and tools (inside the image)
 
-| No Waveform | Aqui (open source, LV2) | Estado inicial |
+| In Waveform | Here (open source, LV2) | Initial state |
 |---|---|---|
-| C1 gate | **LSP Gate Mono** | ligado |
-| MV360 | *(estava desligado)* | — |
-| RBass | **Calf Bass Enhancer** | bypass |
-| PuigTec MEQ5 + F6 + OneKnob Brighter | **LSP Parametric Equalizer x8 Mono** (HPF Butterworth 120 Hz, −3 dB @300 Hz, +3 dB @1,8 kHz, hi-shelf 2,4 kHz) | ligado |
-| GW ToneCentric (dinâmica) | **LSP Compressor Mono** | ligado |
-| GW ToneCentric (cor) | **Calf Saturator** | bypass |
-| Manny M Tone Shaper | *(estava desligado)* | — |
-| La Petite Excite | **Calf Exciter** | ligado |
-| DeEsser | **Calf Deesser** | ligado |
-| Abbey Road Plates | **Dragonfly Plate Reverb** | bypass |
-| *(novo)* | **LSP Filter Mono**: passa-baixos Butterworth 2,9 kHz (largura de banda SSB) | ligado |
-| L1 limiter | **LSP Limiter Mono** — teto −3 dBFS, lookahead 2 ms | ligado |
-| PAZ Analyzer | medidores na UI: entrada, gate, comp, de-ess, limiter, saída | — |
+| C1 gate | **LSP Gate Mono** | on |
+| MV360 | *(was switched off)* | — |
+| RBass | **Calf Bass Enhancer** | bypassed |
+| PuigTec MEQ5 + F6 + OneKnob Brighter | **LSP Parametric Equalizer x8 Mono** (Butterworth HPF 120 Hz, −3 dB @ 300 Hz, +3 dB @ 1.8 kHz, high shelf 2.4 kHz) | on |
+| GW ToneCentric (dynamics) | **LSP Compressor Mono** | on |
+| GW ToneCentric (colour) | **Calf Saturator** | bypassed |
+| Manny M Tone Shaper | *(was switched off)* | — |
+| La Petite Excite | **Calf Exciter** | on |
+| DeEsser | **Calf Deesser** | on |
+| Abbey Road Plates | **Dragonfly Plate Reverb** | bypassed |
+| *(new)* | **LSP Filter Mono**: Butterworth low-pass at 2.9 kHz (SSB bandwidth) | on |
+| L1 limiter | **LSP Limiter Mono**: ceiling −3 dBFS, 2 ms lookahead | on |
+| PAZ Analyzer | meters in the UI: input, gate, comp, de-ess, limiter, output | — |
 
-Ferramentas: **jackd2** (servidor de áudio), **mod-host** (motor LV2 controlado por
-TCP, compilado do código da MOD Audio), **zita-ajbridge** (ponte para uma 2.ª placa),
-**alsa-utils** (mixer e lista das placas), **lilv-utils** (`lv2apply`, para o gráfico do EQ). Pacotes Debian: `lsp-plugins-lv2`, `calf-plugins`,
-`x42-plugins`, `dragonfly-reverb-lv2`. Qualquer outro plugin LV2 instalado pode ser
-acrescentado ao `config/chain.yaml`.
+Tools: **jackd2** (audio server), **mod-host** (LV2 host controlled over TCP,
+built from the MOD Audio source), **zita-ajbridge** (bridge to a second card),
+**alsa-utils** (mixer and card list), **lilv-utils** (`lv2apply`, for the EQ
+graph). Debian packages: `lsp-plugins-lv2`, `calf-plugins`, `x42-plugins`,
+`dragonfly-reverb-lv2`. Any other installed LV2 plugin can be added from the UI
+or to `config/chain.yaml`.
 
-Os valores iniciais são um ponto de partida para SSB; afina-os de ouvido.
+The initial values are a starting point for SSB; tune them by ear.
 
 ---
 
-## 2. Preparar o Debian (uma vez)
+## 2. Prepare Debian (once)
 
-**Não instales PipeWire nem PulseAudio no host**: o JACK do contentor precisa da
-placa só para ele.
+**Do not install PipeWire or PulseAudio on the host**: the container's JACK
+needs exclusive access to the sound card.
 
 ```bash
-# ver as placas e o nome a usar em AUDIO_CARD
+# list the cards and find the name to use in AUDIO_CARD
 cat /proc/asound/cards
 sudo apt install -y alsa-utils && aplay -l && arecord -l
 
-# desligar a suspensão USB e pôr o CPU em performance
+# disable USB autosuspend and set the CPU governor to performance
 sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 usbcore.autosuspend=-1"/' /etc/default/grub
 sudo update-grub
 sudo apt install -y linux-cpupower
@@ -62,179 +67,174 @@ sudo reboot
 
 ---
 
-## 3. Instalar e arrancar
+## 3. Install and start
 
-Os projetos Docker do servidor ficam em `/home/opt` (dentro do `/home`, para
-sobreviverem a uma reinstalação). Os dados do Docker ficam em `/home/docker`.
+On the CT2IEP server, Docker projects live in `/home/opt` (inside `/home`, so
+they survive an OS reinstall) and Docker's data lives in `/home/docker`.
 
 ```bash
-# no servidor, uma vez
-sudo mkdir -p /home/opt && sudo chown pmendes:pmendes /home/opt
+# on the server, once
+sudo mkdir -p /home/opt && sudo chown "$USER:$USER" /home/opt
 
-# obter o projeto
+# get the project
 git clone https://github.com/rpsmendes/ct2iep-audio.git /home/opt/ct2iep-audio
-
-# no servidor
 cd /home/opt/ct2iep-audio
 cp .env.example .env
-nano .env                 # AUDIO_CARD e WEB_PASSWORD (ver abaixo)
+nano .env                 # AUDIO_CARD and WEB_PASSWORD (see below)
 
-docker compose build      # a 1.ª vez demora uns minutos (compila o mod-host)
+docker compose build      # the first build takes a few minutes (compiles mod-host)
 docker compose up -d
-docker compose logs -f engine   # "JACK pronto" e "mod-host a escutar em 5555/5556"
-docker compose logs web         # "cadeia carregada (10 blocos)"
+docker compose logs -f engine   # "JACK ready" and "mod-host listening on 5555/5556"
+docker compose logs web         # "chain loaded (10 blocks)"
 ```
 
-UI: **http://192.168.1.88:8080** (utilizador `ct2iep` e a password do `.env`).
+UI: **http://&lt;server-ip&gt;:8080** (user `ct2iep` and the password from `.env`).
 
-### O ficheiro `.env`
-É a configuração local da instalação; o Compose passa estes valores aos
-contentores. Para começar só precisas de:
+To update after changes in the repository:
 
-- **`AUDIO_CARD`**: nome da placa do microfone, entre `[ ]` em
-  `cat /proc/asound/cards`. Na estação CT2IEP é **`UA22`**. O nome não muda se
-  as placas USB forem ligadas por outra ordem; o número pode mudar.
-- **`WEB_PASSWORD`**: password da UI.
+```bash
+cd /home/opt/ct2iep-audio && git pull && docker compose build && docker compose up -d
+```
 
-Regras: uma variável por linha, `NOME=valor`, **sem comentários na mesma linha**
-(o Compose pode ler o comentário como parte do valor). `JACK_EXTRA=` fica vazio
-salvo necessidade. Depois de mudar o `.env`: `docker compose up -d`.
+### The `.env` file
+Local configuration of the installation; Compose passes these values to the
+containers. To get started you only need:
 
-### Ligações de áudio para o FTDX-101D
-`config/chain.yaml` → `io.inputs` é o canal do microfone (`system:capture_1` =
-entrada 1 da UA22; usa `capture_2` se o microfone estiver na entrada 2) e
-`io.outputs` são as saídas.
+- **`AUDIO_CARD`**: name of the microphone's card, between `[ ]` in
+  `cat /proc/asound/cards`. At CT2IEP it is **`UA22`**. The name does not
+  change if USB devices are plugged in a different order; the number can.
+- **`WEB_PASSWORD`**: password for the UI.
 
-- **Opção A, cabo (por defeito):** saída da UA22 → ficha traseira do rádio
-  (RTTY/DATA). Não se mexe no `.env`. Uma só placa, um só relógio, latência mais
-  baixa.
-- **Opção B, USB do rádio:**
-  1. `cat /proc/asound/cards` com o rádio ligado por USB (normalmente `CODEC`).
-  2. `.env`: `FTDX_CARD=CODEC` e `FTDX_DIR=playback` (a UA22 continua em `AUDIO_CARD`).
+Rules: one variable per line, `NAME=value`, **no comments on the same line**
+(Compose may read the comment as part of the value). Leave `JACK_EXTRA=` empty
+unless needed. After changing `.env`: `docker compose up -d`.
+
+### Audio connections to the FTDX-101D
+In `config/chain.yaml`, `io.inputs` is the microphone channel
+(`system:capture_1` = UA22 input 1; use `capture_2` if the microphone is on
+input 2) and `io.outputs` are the outputs.
+
+- **Option A, cable (default):** UA22 output → the radio's rear socket
+  (RTTY/DATA). No `.env` changes. One card, one clock, lowest latency.
+- **Option B, the radio's USB:**
+  1. `cat /proc/asound/cards` with the radio connected over USB (usually `CODEC`).
+  2. `.env`: `FTDX_CARD=CODEC` and `FTDX_DIR=playback` (the UA22 stays in `AUDIO_CARD`).
   3. `chain.yaml`: `outputs: ["ftdx_out:playback_1", "ftdx_out:playback_2"]`.
   4. `docker compose up -d --force-recreate`; `docker compose logs engine | grep -i zita`.
 
-  O zita-j2a faz o resampling entre os relógios das duas placas (alguns ms a mais).
+  zita-j2a resamples between the two cards' clocks (adds a few ms).
 
-**No rádio:** a fonte de modulação em SSB tem de vir da traseira (REAR) e, na
-opção B, a seleção da traseira tem de ser USB. Confirma os nomes exatos dos menus
-no manual do FTDX-101D.
+**On the radio:** the SSB modulation source must be the rear input (REAR) and,
+for option B, the rear input must be set to USB. Check the exact menu names in
+the FTDX-101D manual.
 
-**PTT:** com o microfone na UA22, o PTT do microfone já não chega ao rádio. Usa
-um pedal na ficha PTT traseira, VOX, ou PTT por CAT/USB (RTS/DTR).
+**PTT:** with the microphone on the UA22, the microphone's PTT no longer reaches
+the radio. Use a foot switch on the rear PTT socket, VOX, or PTT over CAT/USB
+(RTS/DTR).
 
 ---
 
-## 4. Usar a UI
+## 4. Using the UI
 
-### Cadeia
-- **Faixa de blocos** (como no Waveform): clica num bloco para ver os parâmetros;
-  o botão ⏻ liga/desliga (bypass) esse bloco.
-- **Mudar a ordem**: arrasta a pega **⋮⋮** de um bloco para outra posição, ou usa
-  **◀ ▶** no painel do bloco. Só se refazem as ligações JACK que mudam (corte de
-  milissegundos no áudio).
-- **Adicionar / remover**: o **+** no fim da faixa abre a biblioteca com todos os
-  plugins LV2 instalados (pesquisa por nome, autor ou tipo); o plugin entra depois
-  do bloco selecionado. **Remover** no painel tira o bloco da cadeia. A cadeia é
-  mono: nos plugins estéreo entra o mesmo sinal nos dois canais e segue o canal
-  esquerdo; entradas de sidechain ficam desligadas.
-- **A/B · Bypass total**: desliga a cadeia inteira para comparar com o som original.
-- **Sliders**: arrastar ajusta (clicar não muda o valor, para não haver saltos
-  durante uma emissão). **Shift** ou **Ajuste fino** = 10× mais fino. Com o slider
-  selecionado: setas (ganhos ±0,5 dB, ±0,1 dB com Shift), PageUp/PageDown, Home/End.
-  Duplo clique repõe o valor por defeito; a caixa ao lado aceita o valor exato.
-  Tempos e frequências usam escala logarítmica.
-- **Gráfico do EQ**: nos EQs e filtros aparece a resposta em frequência (linha
-  cheia = este bloco; tracejado = soma de todos os EQ/filtros ativos), com a banda
-  SSB típica sombreada. A curva é calculada pelo próprio plugin (impulso offline
-  com o `lv2apply`), por isso é exata em todos os tipos e modos de filtro. Plugins
-  que não dá para medir offline (por exemplo Calf e x42 fil4) mostram uma nota.
-- **Presets**: *Guardar como…* grava a cadeia completa: ordem, blocos e valores
-  (ex.: "SSB DX", "SSB ragchew"). Presets antigos continuam a carregar.
-- **Repor valores** (num bloco) volta aos valores do `chain.yaml`, ou aos do
-  plugin se o bloco foi adicionado pela UI. **Cadeia de fábrica** repõe a cadeia
-  inteira do `chain.yaml`.
-- O estado é gravado sozinho em `data/state.json` e reposto quando o motor reinicia.
-  Vários browsers ao mesmo tempo ficam sincronizados.
+### Chain
+- **Block strip** (like in Waveform): click a block to see its parameters; the
+  ⏻ button switches that block on/off (bypass).
+- **Change the order**: drag a block by its **⋮⋮** handle to another position,
+  or use **◀ ▶** in the block panel. Only the JACK connections that change are
+  redone (a few milliseconds of silence).
+- **Add / remove**: **+** at the end of the strip opens the library of all
+  installed LV2 plugins (search by name, author or type); the plugin is inserted
+  after the selected block. **Remove** in the panel takes the block out of the
+  chain. The chain is mono: stereo plugins get the same signal on both inputs
+  and only the left output continues; sidechain inputs are left unconnected.
+- **A/B · Bypass all**: switches the whole chain off to compare with the
+  original sound.
+- **Sliders**: drag to adjust (clicking does not change the value, so there are
+  no jumps while transmitting). **Shift** or **Fine** = 10× finer. On a focused
+  slider: arrow keys (gains ±0.5 dB, ±0.1 dB with Shift), PageUp/PageDown,
+  Home/End. Double click restores the default; the box next to it takes an
+  exact value. Times and frequencies use a logarithmic scale.
+- **EQ graph**: EQs and filters show their frequency response (solid line =
+  this block; dashed = sum of all active EQs/filters), with the typical SSB band
+  shaded. The curve is computed by the plugin itself (an impulse processed
+  offline with `lv2apply`), so it is exact for every filter type and mode.
+  Plugins that cannot be measured offline (e.g. Calf and x42 fil4) show a note.
+- **Presets**: *Save as…* stores the complete chain: order, blocks and values
+  (e.g. "SSB DX", "SSB ragchew"). Older presets still load.
+- **Reset values** (on a block) goes back to the `chain.yaml` values, or to the
+  plugin defaults for blocks added from the UI. **Factory chain** restores the
+  whole chain from `chain.yaml`.
+- The state is saved automatically to `data/state.json` and restored when the
+  engine restarts. Several browsers at the same time stay in sync.
 
-### Plugins (pacotes a pedido)
-O separador **Plugins** instala e remove pacotes Debian de plugins LV2 **sem
-recompilar a imagem**: catálogo sugerido para voz (ZAM, SWH, MDA, FOMP, EQ10Q,
-Invada, abGate) e um campo para qualquer outro pacote. O pacote é descarregado do
-repositório Debian e só os bundles LV2 são copiados para `data/lv2` (persistente;
-bibliotecas que faltem vão para `data/lv2/.lib`). Depois de instalar, usa o **+**
-na Cadeia para adicionar os plugins novos.
+### Plugins (packages on demand)
+The **Plugins** tab installs and removes Debian packages of LV2 plugins
+**without rebuilding the image**: a suggested catalog for voice (ZAM, SWH, MDA,
+FOMP, EQ10Q, Invada, abGate) plus a field for any other package. The package is
+downloaded from the Debian repository and only its LV2 bundles are copied to
+`data/lv2/bundles` (persistent; libraries they need go to `data/lv2/lib`). After
+installing, use **+** in the Chain tab to add the new plugins.
 
-- Instalar ou remover reinicia o mod-host (~2 s sem áudio; o JACK continua): **não
-  o faças durante uma emissão**. A cadeia volta a carregar sozinha.
-- Não deixa remover um pacote com plugins em uso na cadeia.
-- Se um pacote não existir no Debian 13, a UI diz logo; o registo da operação fica
-  visível em baixo.
+- Installing or removing restarts mod-host (~2 s without audio; JACK keeps
+  running): **do not do it while transmitting**. The chain reloads by itself.
+- A package whose plugins are in use in the chain cannot be removed.
+- If a package does not exist in Debian 13, the UI says so straight away; the
+  log of the operation is shown at the bottom.
 
-### Placa
-Lista as interfaces de áudio (via `aplay -l`/`arecord -l`) e mostra o mixer ALSA
-da placa escolhida (por defeito a da cadeia). A UA22 não tem ganhos controláveis
-por software (só expõe "MIDI Input Mode"): ganho de entrada e volume são nos
-botões da própria placa. O CODEC USB do FTDX-101D, por exemplo, tem `PCM` e `Mic`.
+### Card
+Lists the audio interfaces (via `aplay -l`/`arecord -l`) and shows the ALSA
+mixer of the selected card (by default the chain's card). The UA22 has no
+software-controllable gains (it only exposes "MIDI Input Mode"): input gain and
+volume are set with the card's own knobs. The FTDX-101D USB CODEC, for example,
+has `PCM` and `Mic`.
 
-## 5. Ajustes comuns
+## 5. Common adjustments
 
-| Quero… | Onde |
+| I want to… | Where |
 |---|---|
-| Mudar a ordem / adicionar / remover blocos | na UI (separador Cadeia) |
-| Mudar a cadeia de fábrica | `config/chain.yaml` → `docker compose restart web` → *Cadeia de fábrica* na UI |
-| Mais plugins | separador Plugins (ou `docker compose exec web ls /data/lv2`) |
-| Menos latência | `.env`: `PERIOD=64` (se houver estalos, volta a 128 ou `NPERIODS=3`) |
-| Ver erros | `docker compose logs -f engine web` |
-| Testar o Python/plugins na imagem | `docker compose run --rm --no-deps web python3 -c "import lilv; print('ok')"` |
-| Atualizar | `git pull && docker compose build && docker compose up -d` |
+| Change the order / add / remove blocks | in the UI (Chain tab) |
+| Change the factory chain | `config/chain.yaml` → `docker compose restart web` → *Factory chain* in the UI |
+| Get more plugins | Plugins tab (or `docker compose exec web ls /data/lv2/bundles`) |
+| Lower the latency | `.env`: `PERIOD=64` (if you hear clicks, go back to 128 or use `NPERIODS=3`) |
+| See errors | `docker compose logs -f engine web` |
+| Test Python/plugins in the image | `docker compose run --rm --no-deps web python3 -c "import lilv; print('ok')"` |
+| Update | `git pull && docker compose build && docker compose up -d` |
 
-Latência esperada: 2 períodos × 128 amostras a 48 kHz ≈ 5,3 ms + buffers USB e
-lookahead do limiter (2 ms) → cerca de 10–15 ms ida-e-volta.
+Expected latency: 2 periods × 128 samples at 48 kHz ≈ 5.3 ms + USB buffers and
+the limiter lookahead (2 ms) → about 10–15 ms round trip.
 
-## 6. Problemas resolvidos na instalação
+## 6. Troubleshooting (issues solved during installation)
 
-| Mensagem | Causa | Solução (já incluída) |
+| Message | Cause | Fix (already included) |
 |---|---|---|
-| `env: 'python3': No such file or directory` no build | o build do mod-host usa Python | `python3` na fase de build |
-| `Audio device hw:UA22 cannot be acquired` / `session bus for device reservation` | o JACK tenta reservar a placa via D-Bus, que não existe num servidor | `JACK_NO_AUDIO_RESERVATION=1` na imagem |
-| `cannot set channel count to 1 for capture` | `JACK_EXTRA` com `-i 1` (comentário lido como valor); a UA22 só aceita 2 canais | `JACK_EXTRA=` vazio, comentários em linhas separadas |
-| `[engine] jackd não arrancou` com o JACK a correr | no Debian 13 o `jack_lsp` está no `jack-example-tools` | pacote `jack-example-tools` |
-| `OSError: liblilv-0.so: cannot open shared object file` | o `python3-lilv` procura a biblioteca sem versão, que só vem no `-dev` | pacote `liblilv-dev` |
+| `env: 'python3': No such file or directory` during the build | the mod-host build uses Python | `python3` in the build stage |
+| `Audio device hw:UA22 cannot be acquired` / `session bus for device reservation` | JACK tries to reserve the card via D-Bus, which does not exist on a server | `JACK_NO_AUDIO_RESERVATION=1` in the image |
+| `cannot set channel count to 1 for capture` | `JACK_EXTRA` containing `-i 1` (a comment read as the value); the UA22 only accepts 2 channels | empty `JACK_EXTRA=`, comments on their own lines |
+| `[engine] jackd did not start` while JACK is running | in Debian 13 `jack_lsp` is in `jack-example-tools` | `jack-example-tools` package |
+| `OSError: liblilv-0.so: cannot open shared object file` | `python3-lilv` looks for the unversioned library, which only ships in `-dev` | `liblilv-dev` package |
 
-Mensagens normais no arranque do motor: `jack_get_descriptor returns null for
-'jack_intime.so'` (e semelhantes) e **um** XRun do `mod-monitor` enquanto os
-plugins carregam. Só há problema se os XRuns continuarem com o áudio a correr:
-`docker compose logs -f engine | grep -i xrun` → se repetirem, `NPERIODS=3` ou
-`PERIOD=256`.
+Normal messages when the engine starts: `jack_get_descriptor returns null for
+'jack_intime.so'` (and similar) and **one** XRun from `mod-monitor` while the
+plugins load. It is only a problem if XRuns keep happening while audio is
+running: `docker compose logs -f engine | grep -i xrun` → if they repeat, use
+`NPERIODS=3` or `PERIOD=256`.
 
-Se uma alteração ao Dockerfile parecer não ter efeito:
+If a Dockerfile change seems to have no effect:
 `docker compose build --no-cache && docker compose up -d --force-recreate`.
 
-## 7. Histórico de alterações relevantes
-
-- **Valores de fábrica do EQ e do passa-baixos corrigidos**: o HPF (120 Hz) e o
-  LPF (2,9 kHz) passaram a Butterworth (−3 dB na frequência de corte). Antes, com
-  RLC x4, cortavam −24 dB na própria frequência e o LPF abafava a voz a partir de
-  ~1 kHz; os Bell do EQ tinham `q=0` (larguíssimos). Um estado já existente mantém
-  os valores antigos: para aplicar, usa **Repor valores** no EQ e no Passa-baixos
-  (ou **Cadeia de fábrica**). O gráfico mostra a diferença.
-- O `state.json` passou ao formato v2 (lista ordenada de blocos); o antigo é
-  migrado automaticamente no primeiro arranque.
-
-## 8. Notas
-- O nível que entra no rádio define-se com o **ganho de saída** (mixer da placa
-  ou `g_out` do limiter) olhando para o ALC do FTDX: o limiter garante que nunca
-  passa de −3 dBFS.
-- A UI usa autenticação básica se `WEB_PASSWORD` estiver definida. Não a exponhas
-  à Internet sem passar pela VPN.
-- Estrutura:
-  - `docker/`: imagem e arranque do motor (`engine.sh`: JACK, pontes zita,
-    mod-host, reinício do mod-host quando os plugins mudam)
-  - `app/server.py`: API e ligação ao mod-host; `app/lv2meta.py`: metadados e
-    biblioteca LV2; `app/response.py`: curva dos EQs; `app/packages.py`: pacotes
-    de plugins a pedido
-  - `app/static/`: UI (`app.js` núcleo; `chain-edit.js`, `graph.js`,
-    `plugins.js`, `card.js` por funcionalidade)
-  - `config/chain.yaml`: cadeia de fábrica
-  - `data/`: estado, presets e plugins instalados pela UI (fora do Git)
+## 7. Notes
+- The level going into the radio is set with the **output gain** (card mixer or
+  the limiter's `g_out`) while watching the FTDX ALC: the limiter guarantees it
+  never exceeds −3 dBFS.
+- The UI uses basic authentication when `WEB_PASSWORD` is set. Do not expose it
+  to the Internet without a VPN.
+- Layout:
+  - `docker/`: image and engine startup (`engine.sh`: JACK, zita bridges,
+    mod-host, mod-host restart when plugins change)
+  - `app/server.py`: API and mod-host connection; `app/lv2meta.py`: LV2
+    metadata and library; `app/response.py`: EQ curves; `app/packages.py`:
+    plugin packages on demand
+  - `app/static/`: UI (`app.js` core; `chain-edit.js`, `graph.js`,
+    `plugins.js`, `card.js` one per feature)
+  - `config/chain.yaml`: factory chain
+  - `data/`: state, presets and plugins installed from the UI (not in Git)
