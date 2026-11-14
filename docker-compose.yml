@@ -25,6 +25,7 @@ services:
     shm_size: 256m
     volumes:
       - ./data/lv2:/data/lv2:ro   # plugins installed on demand from the UI
+      - ./data/engine:/data/engine  # output selection (from the UI) and bridge status
     expose:
       - "5555"            # mod-host commands (compose internal network only)
       - "5556"            # feedback (meters)

@@ -79,8 +79,51 @@ async function loadMixer() {
   }
 }
 
+// ---------- output selection ----------
+const keyOf = (card, dev) => `${card},${dev}`;
+async function loadOutputs(data) {
+  const r = data || await api("GET", "/api/outputs");
+  $("#mainCard").textContent = r.main ? `hw:${r.main},0` : "AUDIO_CARD";
+  const sel = new Map(r.selected.map(o => [keyOf(o.card, o.device), o]));
+  const rows = [];
+  for (const c of CARD.list) for (const d of c.playback) rows.push({ card: c.id, device: d.device, label: `${c.id} · ${d.name}`, sub: `${c.name} · hw:${c.id},${d.device}` });
+  // selected devices that are not connected right now
+  for (const o of r.selected) if (!rows.some(x => keyOf(x.card, x.device) === keyOf(o.card, o.device)))
+    rows.push({ card: o.card, device: o.device, label: `${o.card} · device ${o.device}`, sub: "not detected (unplugged?)", gone: true });
+  const box = $("#outputs"); box.innerHTML = "";
+  for (const x of rows) {
+    const k = keyOf(x.card, x.device), o = sel.get(k);
+    const main = x.card === r.main && x.device === 0;
+    const row = el("label", "out-row" + (o ? " on" : "") + (x.gone ? " gone" : ""));
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = !!o; cb.dataset.card = x.card; cb.dataset.device = x.device;
+    cb.onchange = saveOutputs;
+    const info = el("div", "out-info");
+    info.append(el("div", "out-name", x.label), el("div", "muted small", x.sub));
+    const badges = el("div", "badges");
+    if (main) badges.append(el("span", "badge installed", "main card · direct"));
+    else if (o) {
+      const st = { running: ["installed", "bridge running"], failed: ["available", "bridge failed"], starting: ["base", "bridge starting…"] }[o.state] || ["base", o.state];
+      const b = el("span", "badge " + st[0], st[1]); if (o.detail) b.title = o.detail; badges.append(b);
+    } else badges.append(el("span", "badge base", "via bridge"));
+    row.append(cb, info, badges);
+    if (o && o.state === "failed" && o.detail) info.append(el("div", "small warn-text", o.detail));
+    box.append(row);
+  }
+  if (!rows.length) box.append(el("p", "muted", "No playback device found."));
+  // bridges take a moment to start: refresh the status a few times
+  clearTimeout(CARD.outT);
+  if (r.selected.some(o => !o.main && o.state !== "running") && !$("#tab-card").hidden && (CARD.outTries = (CARD.outTries || 0) + 1) < 8)
+    CARD.outT = setTimeout(() => loadOutputs().catch(() => {}), 2500);
+}
+async function saveOutputs() {
+  const selected = [...document.querySelectorAll("#outputs input:checked")].map(c => ({ card: c.dataset.card, device: +c.dataset.device }));
+  if (!selected.length) { toast("Select at least one output"); loadOutputs(); return; }
+  try { CARD.outTries = 0; await loadOutputs(await api("POST", "/api/outputs", { selected })); toast("Output changed"); }
+  catch (e) { toast(e.message); loadOutputs(); }
+}
+
 async function showCardTab() {
-  try { await loadCards(); await loadMixer(); }
+  try { await loadCards(); CARD.outTries = 0; await loadOutputs(); await loadMixer(); }
   catch (e) { toast(e.message); }
 }
 $("#cardSel").onchange = () => {

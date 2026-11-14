@@ -36,7 +36,8 @@ FEEDBACK_PORT = int(os.environ.get("MODHOST_FEEDBACK_PORT", "5556"))
 CHAIN_FILE = Path(os.environ.get("CHAIN_FILE", "/config/chain.yaml"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 STATIC_DIR = Path(__file__).with_name("static")
-MIXER_CARD = os.environ.get("MIXER_CARD") or os.environ.get("AUDIO_CARD", "")
+MAIN_CARD = os.environ.get("AUDIO_CARD", "")
+MIXER_CARD = os.environ.get("MIXER_CARD") or MAIN_CARD
 WEB_USER = os.environ.get("WEB_USER", "")
 WEB_PASSWORD = os.environ.get("WEB_PASSWORD", "")
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8080"))
@@ -246,6 +247,68 @@ def chain_view(app):
 
 
 # ----------------------------------------------------------------------------
+# Outputs: where the processed audio goes
+# ----------------------------------------------------------------------------
+# data/engine/outputs.txt has one "CARD DEVICE" line per selected playback
+# device. The main card (AUDIO_CARD, device 0) is JACK's own device; any other
+# device gets a zita-j2a bridge (adaptive resampling) started by engine.sh,
+# whose JACK client is called out_<CARD>_<DEVICE>. engine.sh reports the
+# bridges in data/engine/bridges.status.
+def engine_dir():
+    d = DATA_DIR / "engine"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def load_outputs():
+    f = DATA_DIR / "engine" / "outputs.txt"
+    out = []
+    if f.exists():
+        for ln in f.read_text().splitlines():
+            parts = ln.split()
+            if parts and SAFE_CARD.match(parts[0]):
+                dev = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+                if (parts[0], dev) not in out:
+                    out.append((parts[0], dev))
+    return out or [(MAIN_CARD, 0)]
+
+
+def save_outputs(outs):
+    f = engine_dir() / "outputs.txt"
+    tmp = f.with_suffix(".tmp")
+    tmp.write_text("".join(f"{c} {d}\n" for c, d in outs))
+    tmp.replace(f)
+
+
+def bridge_name(card, dev):
+    return f"out_{card}_{dev}"
+
+
+def is_main(card, dev):
+    return card == MAIN_CARD and dev == 0
+
+
+def output_ports(app, card, dev):
+    if is_main(card, dev):
+        return app["factory"].outputs
+    n = bridge_name(card, dev)
+    return [f"{n}:playback_1", f"{n}:playback_2"]
+
+
+def bridge_status():
+    f = DATA_DIR / "engine" / "bridges.status"
+    st = {}
+    try:
+        for ln in f.read_text().splitlines():
+            parts = ln.split(" ", 2)
+            if len(parts) >= 2:
+                st[parts[0]] = {"state": parts[1], "detail": parts[2] if len(parts) > 2 else ""}
+    except OSError:
+        pass
+    return st
+
+
+# ----------------------------------------------------------------------------
 # Engine (mod-host)
 # ----------------------------------------------------------------------------
 class Engine:
@@ -326,9 +389,10 @@ class Engine:
                 for a in meta["audio_in"]:
                     links.add((s, f"effect_{i}:{a}"))
             src = [f"effect_{i}:{meta['audio_out'][0]}"]
-        for s in src:
-            for o in f.outputs:
-                links.add((s, o))
+        for card, dev in self.app["rt"]["outputs"]:
+            for s in src:
+                for o in output_ports(self.app, card, dev):
+                    links.add((s, o))
         return links
 
     async def rewire(self):
@@ -337,8 +401,16 @@ class Engine:
         for a, b in sorted(self.links - new):
             await self.cmd(f'disconnect "{a}" "{b}"', quiet=True)
         for a, b in sorted(new - self.links):
-            await self.cmd(f'connect "{a}" "{b}"')
+            # bridge ports may not exist yet: keep_bridges() retries them
+            await self.cmd(f'connect "{a}" "{b}"', quiet=b.startswith("out_"))
         self.links = new
+
+    async def keep_bridges(self):
+        """Output bridges come and go (started late, card unplugged and back):
+        reissue their connections; connect is a no-op when already connected."""
+        for a, b in sorted(self.links):
+            if b.startswith("out_"):
+                await self.cmd(f'connect "{a}" "{b}"', quiet=True)
 
     async def sync(self):
         """Brings mod-host in line with the state: loads the blocks that must run,
@@ -521,6 +593,18 @@ async def op_apply_state(app, new_state):
                         await eng.cmd(f"param_set {i} {s} {v:.6g}", quiet=True)
             await eng.sync()
     await chain_changed(app)
+
+
+async def bridge_keeper(app):
+    while True:
+        await asyncio.sleep(3)
+        eng: Engine = app["engine"]
+        if eng.online and any(not is_main(c, d) for c, d in app["rt"]["outputs"]):
+            try:
+                async with app["rt"]["oplock"]:
+                    await eng.keep_bridges()
+            except Exception as e:  # noqa: BLE001
+                log.debug("bridge keeper: %r", e)
 
 
 async def meter_ticker(app):
@@ -797,6 +881,40 @@ async def h_cards(request):
     return web.json_response({"cards": cards, "raw": raw, "default": MIXER_CARD})
 
 
+async def h_outputs(request):
+    app = request.app
+    st = bridge_status()
+    out = []
+    for c, d in app["rt"]["outputs"]:
+        item = {"card": c, "device": d, "main": is_main(c, d)}
+        if not item["main"]:
+            b = st.get(bridge_name(c, d), {"state": "starting", "detail": ""})
+            item.update(b)
+        out.append(item)
+    return web.json_response({"main": MAIN_CARD, "selected": out})
+
+
+async def h_outputs_set(request):
+    app = request.app
+    body = await request.json()
+    outs = []
+    for o in body.get("selected") or []:
+        c, d = str(o.get("card", "")), o.get("device", 0)
+        if not SAFE_CARD.match(c) or not isinstance(d, int) or not 0 <= d < 64:
+            return err("invalid output")
+        if (c, d) not in outs:
+            outs.append((c, d))
+    if not outs:
+        return err("select at least one output")
+    async with app["rt"]["oplock"]:
+        app["rt"]["outputs"] = outs
+        save_outputs(outs)
+        if app["engine"].online:
+            await app["engine"].rewire()
+    log.info("outputs: %s", ", ".join(f"{c},{d}" for c, d in outs))
+    return await h_outputs(request)
+
+
 async def h_mixer(request):
     card = card_param(request)
     if not card:
@@ -896,7 +1014,8 @@ async def on_startup(app):
     # scanning ~300 plugins takes a couple of CPU seconds and must not compete
     # with mod-host while it loads the chain at startup.
     app["tasks"] = [asyncio.create_task(app["engine"].run()),
-                    asyncio.create_task(meter_ticker(app))]
+                    asyncio.create_task(meter_ticker(app)),
+                    asyncio.create_task(bridge_keeper(app))]
 
 
 async def on_shutdown(app):
@@ -923,6 +1042,7 @@ def make_app():
     app["rt"] = {"oplock": asyncio.Lock()}
     app["rt"]["state"] = normalize_state(app, saved)
     app["sockets"] = set()
+    app["rt"]["outputs"] = load_outputs()
     app["engine"] = Engine(app)
     r = app.router
     r.add_get("/", h_index)
@@ -938,6 +1058,8 @@ def make_app():
     r.add_post("/api/presets/{name}/load", h_preset_load)
     r.add_delete("/api/presets/{name}", h_preset_delete)
     r.add_get("/api/cards", h_cards)
+    r.add_get("/api/outputs", h_outputs)
+    r.add_post("/api/outputs", h_outputs_set)
     r.add_get("/api/mixer", h_mixer)
     r.add_post("/api/mixer", h_mixer_set)
     r.add_get("/api/packages", h_packages)

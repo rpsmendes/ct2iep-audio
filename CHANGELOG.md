@@ -5,6 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Output selector** (Card tab → *Output*): choose which playback devices
+  receive the processed audio, detected automatically, several at once. The
+  main card is JACK's own device; any other one (e.g. the FTDX-101D USB codec)
+  is fed through a zita-j2a resampling bridge that the engine starts, stops and
+  retries (card unplugged) by itself, with its state shown in the UI. Stored in
+  `data/engine/outputs.txt`. Requires `docker compose up -d` (new volume for
+  the engine).
+
 ### Changed
 - **A/B and block bypass now really switch plugins off.** mod-host's own
   bypass keeps running the plugin every cycle, so CPU use did not drop. Now a

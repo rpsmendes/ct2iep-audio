@@ -111,17 +111,18 @@ unless needed. After changing `.env`: `docker compose up -d`.
 ### Audio connections to the FTDX-101D
 In `config/chain.yaml`, `io.inputs` is the microphone channel
 (`system:capture_1` = UA22 input 1; use `capture_2` if the microphone is on
-input 2) and `io.outputs` are the outputs.
+input 2) and `io.outputs` are the main card's output ports. **Which cards
+receive the processed audio is chosen in the UI** (Card tab → *Output*).
 
 - **Option A, cable (default):** UA22 output → the radio's rear socket
   (RTTY/DATA). No `.env` changes. One card, one clock, lowest latency.
-- **Option B, the radio's USB:**
-  1. `cat /proc/asound/cards` with the radio connected over USB (usually `CODEC`).
-  2. `.env`: `FTDX_CARD=CODEC` and `FTDX_DIR=playback` (the UA22 stays in `AUDIO_CARD`).
-  3. `chain.yaml`: `outputs: ["ftdx_out:playback_1", "ftdx_out:playback_2"]`.
-  4. `docker compose up -d --force-recreate`; `docker compose logs engine | grep -i zita`.
-
-  zita-j2a resamples between the two cards' clocks (adds a few ms).
+- **Option B, the radio's USB:** connect the radio over USB; in the UI, Card
+  tab → *Output*, tick the radio's card (usually `CODEC`) and untick the UA22
+  if you do not want both. The UA22 stays the clock master (`AUDIO_CARD`); the
+  radio's card is fed through a zita-j2a bridge that resamples between the two
+  clocks (a few ms more latency). The bridge is started by the engine
+  (`docker compose logs engine | grep bridge`) and restarted if the radio is
+  switched off and on again.
 
 **On the radio:** the SSB modulation source must be the rear input (REAR) and,
 for option B, the rear input must be set to USB. Check the exact menu names in
@@ -184,7 +185,14 @@ installing, use **+** in the Chain tab to add the new plugins.
   log of the operation is shown at the bottom.
 
 ### Card
-Lists the audio interfaces (via `aplay -l`/`arecord -l`) and shows the ALSA
+**Output**: tick the playback devices that receive the processed audio
+(detected automatically; several at once is fine). The main card is JACK's own
+device; any other one goes through a resampling bridge, with its state shown
+next to it (running / failed with the reason, e.g. card unplugged; it is
+retried every 10 s). The choice is stored in `data/engine/outputs.txt` and is
+not part of presets.
+
+The tab also lists the audio interfaces (via `aplay -l`/`arecord -l`) and shows the ALSA
 mixer of the selected card (by default the chain's card). The UA22 has no
 software-controllable gains (it only exposes "MIDI Input Mode"): input gain and
 volume are set with the card's own knobs. The FTDX-101D USB CODEC, for example,

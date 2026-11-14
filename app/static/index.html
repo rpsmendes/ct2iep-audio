@@ -59,6 +59,13 @@
   </section>
 
   <section id="tab-card" hidden>
+    <h3 class="section-title first">Output · where the processed audio goes</h3>
+    <div id="outputs" class="outputs"></div>
+    <p class="hint">The main card (<span id="mainCard"></span>) is JACK's own device. Any other device is fed
+      through a resampling bridge (zita-j2a: its clock is independent, a few ms more latency). You can send to
+      several devices at once, e.g. the UA22 and the FTDX-101D USB codec.</p>
+
+    <h3 class="section-title">Mixer</h3>
     <div class="toolbar">
       <div class="row">
         <label for="cardSel"><strong>Card</strong></label>

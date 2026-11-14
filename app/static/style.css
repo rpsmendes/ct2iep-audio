@@ -215,3 +215,12 @@ code { font-family: var(--mono); font-size: 12px; }
   .panel .actions { justify-content: flex-start; }
 }
 .meter.off { opacity: .4; }
+.section-title.first { margin-top: 0; }
+.outputs { display: grid; gap: 6px; max-width: 760px; }
+.out-row { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.out-row.on { border-color: var(--accent); }
+.out-row.gone { opacity: .7; }
+.out-row input { width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
+.out-info { flex: 1; min-width: 0; }
+.out-name { font-weight: 600; }

@@ -12,8 +12,8 @@
 io:
   # microphone input (channel 1 of the main card)
   inputs: ["system:capture_1"]
-  # outputs: main card (L+R). For the FTDX USB use
-  #   ["ftdx_out:playback_1", "ftdx_out:playback_2"]   (and FTDX_CARD in .env)
+  # output ports of the main card (L+R). Other cards (e.g. the FTDX USB codec)
+  # are chosen in the UI: Card tab -> Output.
   outputs: ["system:playback_1", "system:playback_2"]
 
 blocks:
