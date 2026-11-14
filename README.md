@@ -21,20 +21,20 @@ Tudo corre em Docker Compose. No Debian só ficam o kernel/ALSA e o Docker.
 | C1 gate | **LSP Gate Mono** | ligado |
 | MV360 | *(estava desligado)* | — |
 | RBass | **Calf Bass Enhancer** | bypass |
-| PuigTec MEQ5 + F6 + OneKnob Brighter | **LSP Parametric Equalizer x8 Mono** (HPF 120 Hz, corte 300 Hz, presença 1,8 kHz, hi-shelf 2,4 kHz) | ligado |
+| PuigTec MEQ5 + F6 + OneKnob Brighter | **LSP Parametric Equalizer x8 Mono** (HPF Butterworth 120 Hz, −3 dB @300 Hz, +3 dB @1,8 kHz, hi-shelf 2,4 kHz) | ligado |
 | GW ToneCentric (dinâmica) | **LSP Compressor Mono** | ligado |
 | GW ToneCentric (cor) | **Calf Saturator** | bypass |
 | Manny M Tone Shaper | *(estava desligado)* | — |
 | La Petite Excite | **Calf Exciter** | ligado |
 | DeEsser | **Calf Deesser** | ligado |
 | Abbey Road Plates | **Dragonfly Plate Reverb** | bypass |
-| *(novo)* | **LSP Filter Mono** — passa-baixos 2,9 kHz (largura de banda SSB) | ligado |
+| *(novo)* | **LSP Filter Mono**: passa-baixos Butterworth 2,9 kHz (largura de banda SSB) | ligado |
 | L1 limiter | **LSP Limiter Mono** — teto −3 dBFS, lookahead 2 ms | ligado |
 | PAZ Analyzer | medidores na UI: entrada, gate, comp, de-ess, limiter, saída | — |
 
 Ferramentas: **jackd2** (servidor de áudio), **mod-host** (motor LV2 controlado por
 TCP, compilado do código da MOD Audio), **zita-ajbridge** (ponte para uma 2.ª placa),
-**alsa-utils** (mixer da placa). Pacotes Debian: `lsp-plugins-lv2`, `calf-plugins`,
+**alsa-utils** (mixer e lista das placas), **lilv-utils** (`lv2apply`, para o gráfico do EQ). Pacotes Debian: `lsp-plugins-lv2`, `calf-plugins`,
 `x42-plugins`, `dragonfly-reverb-lv2`. Qualquer outro plugin LV2 instalado pode ser
 acrescentado ao `config/chain.yaml`.
 
@@ -127,26 +127,67 @@ um pedal na ficha PTT traseira, VOX, ou PTT por CAT/USB (RTS/DTR).
 
 ## 4. Usar a UI
 
-- **Barra de blocos** (como no Waveform): clica num bloco para ver os parâmetros;
+### Cadeia
+- **Faixa de blocos** (como no Waveform): clica num bloco para ver os parâmetros;
   o botão ⏻ liga/desliga (bypass) esse bloco.
+- **Mudar a ordem**: arrasta a pega **⋮⋮** de um bloco para outra posição, ou usa
+  **◀ ▶** no painel do bloco. Só se refazem as ligações JACK que mudam (corte de
+  milissegundos no áudio).
+- **Adicionar / remover**: o **+** no fim da faixa abre a biblioteca com todos os
+  plugins LV2 instalados (pesquisa por nome, autor ou tipo); o plugin entra depois
+  do bloco selecionado. **Remover** no painel tira o bloco da cadeia. A cadeia é
+  mono: nos plugins estéreo entra o mesmo sinal nos dois canais e segue o canal
+  esquerdo; entradas de sidechain ficam desligadas.
 - **A/B · Bypass total**: desliga a cadeia inteira para comparar com o som original.
-- **Parâmetros**: os principais aparecem logo; os restantes em *Avançado*.
-  Ganhos em dB. Duplo clique num slider repõe o valor por defeito; também podes
-  escrever o valor na caixa.
-- **Presets**: *Guardar como…* grava o estado atual (ex.: "SSB DX", "SSB ragchew").
-- **Placa**: ganhos e mutes do mixer ALSA da placa externa.
+- **Sliders**: arrastar ajusta (clicar não muda o valor, para não haver saltos
+  durante uma emissão). **Shift** ou **Ajuste fino** = 10× mais fino. Com o slider
+  selecionado: setas (ganhos ±0,5 dB, ±0,1 dB com Shift), PageUp/PageDown, Home/End.
+  Duplo clique repõe o valor por defeito; a caixa ao lado aceita o valor exato.
+  Tempos e frequências usam escala logarítmica.
+- **Gráfico do EQ**: nos EQs e filtros aparece a resposta em frequência (linha
+  cheia = este bloco; tracejado = soma de todos os EQ/filtros ativos), com a banda
+  SSB típica sombreada. A curva é calculada pelo próprio plugin (impulso offline
+  com o `lv2apply`), por isso é exata em todos os tipos e modos de filtro. Plugins
+  que não dá para medir offline (por exemplo Calf e x42 fil4) mostram uma nota.
+- **Presets**: *Guardar como…* grava a cadeia completa: ordem, blocos e valores
+  (ex.: "SSB DX", "SSB ragchew"). Presets antigos continuam a carregar.
+- **Repor valores** (num bloco) volta aos valores do `chain.yaml`, ou aos do
+  plugin se o bloco foi adicionado pela UI. **Cadeia de fábrica** repõe a cadeia
+  inteira do `chain.yaml`.
 - O estado é gravado sozinho em `data/state.json` e reposto quando o motor reinicia.
   Vários browsers ao mesmo tempo ficam sincronizados.
+
+### Plugins (pacotes a pedido)
+O separador **Plugins** instala e remove pacotes Debian de plugins LV2 **sem
+recompilar a imagem**: catálogo sugerido para voz (ZAM, SWH, MDA, FOMP, EQ10Q,
+Invada, abGate) e um campo para qualquer outro pacote. O pacote é descarregado do
+repositório Debian e só os bundles LV2 são copiados para `data/lv2` (persistente;
+bibliotecas que faltem vão para `data/lv2/.lib`). Depois de instalar, usa o **+**
+na Cadeia para adicionar os plugins novos.
+
+- Instalar ou remover reinicia o mod-host (~2 s sem áudio; o JACK continua): **não
+  o faças durante uma emissão**. A cadeia volta a carregar sozinha.
+- Não deixa remover um pacote com plugins em uso na cadeia.
+- Se um pacote não existir no Debian 13, a UI diz logo; o registo da operação fica
+  visível em baixo.
+
+### Placa
+Lista as interfaces de áudio (via `aplay -l`/`arecord -l`) e mostra o mixer ALSA
+da placa escolhida (por defeito a da cadeia). A UA22 não tem ganhos controláveis
+por software (só expõe "MIDI Input Mode"): ganho de entrada e volume são nos
+botões da própria placa. O CODEC USB do FTDX-101D, por exemplo, tem `PCM` e `Mic`.
 
 ## 5. Ajustes comuns
 
 | Quero… | Onde |
 |---|---|
-| Mudar a ordem/plugins da cadeia | `config/chain.yaml` → `docker compose restart web` |
+| Mudar a ordem / adicionar / remover blocos | na UI (separador Cadeia) |
+| Mudar a cadeia de fábrica | `config/chain.yaml` → `docker compose restart web` → *Cadeia de fábrica* na UI |
+| Mais plugins | separador Plugins (ou `docker compose exec web ls /data/lv2`) |
 | Menos latência | `.env`: `PERIOD=64` (se houver estalos, volta a 128 ou `NPERIODS=3`) |
 | Ver erros | `docker compose logs -f engine web` |
 | Testar o Python/plugins na imagem | `docker compose run --rm --no-deps web python3 -c "import lilv; print('ok')"` |
-| Atualizar | `docker compose build --pull && docker compose up -d` |
+| Atualizar | `git pull && docker compose build && docker compose up -d` |
 
 Latência esperada: 2 períodos × 128 amostras a 48 kHz ≈ 5,3 ms + buffers USB e
 lookahead do limiter (2 ms) → cerca de 10–15 ms ida-e-volta.
@@ -170,11 +211,30 @@ plugins carregam. Só há problema se os XRuns continuarem com o áudio a correr
 Se uma alteração ao Dockerfile parecer não ter efeito:
 `docker compose build --no-cache && docker compose up -d --force-recreate`.
 
-## 7. Notas
+## 7. Histórico de alterações relevantes
+
+- **Valores de fábrica do EQ e do passa-baixos corrigidos**: o HPF (120 Hz) e o
+  LPF (2,9 kHz) passaram a Butterworth (−3 dB na frequência de corte). Antes, com
+  RLC x4, cortavam −24 dB na própria frequência e o LPF abafava a voz a partir de
+  ~1 kHz; os Bell do EQ tinham `q=0` (larguíssimos). Um estado já existente mantém
+  os valores antigos: para aplicar, usa **Repor valores** no EQ e no Passa-baixos
+  (ou **Cadeia de fábrica**). O gráfico mostra a diferença.
+- O `state.json` passou ao formato v2 (lista ordenada de blocos); o antigo é
+  migrado automaticamente no primeiro arranque.
+
+## 8. Notas
 - O nível que entra no rádio define-se com o **ganho de saída** (mixer da placa
   ou `g_out` do limiter) olhando para o ALC do FTDX: o limiter garante que nunca
   passa de −3 dBFS.
 - A UI usa autenticação básica se `WEB_PASSWORD` estiver definida. Não a exponhas
   à Internet sem passar pela VPN.
-- Estrutura: `docker/` (imagem e arranque do motor), `app/` (backend Python +
-  UI), `config/chain.yaml` (cadeia), `data/` (estado e presets).
+- Estrutura:
+  - `docker/`: imagem e arranque do motor (`engine.sh`: JACK, pontes zita,
+    mod-host, reinício do mod-host quando os plugins mudam)
+  - `app/server.py`: API e ligação ao mod-host; `app/lv2meta.py`: metadados e
+    biblioteca LV2; `app/response.py`: curva dos EQs; `app/packages.py`: pacotes
+    de plugins a pedido
+  - `app/static/`: UI (`app.js` núcleo; `chain-edit.js`, `graph.js`,
+    `plugins.js`, `card.js` por funcionalidade)
+  - `config/chain.yaml`: cadeia de fábrica
+  - `data/`: estado, presets e plugins instalados pela UI (fora do Git)
