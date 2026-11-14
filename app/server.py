@@ -34,6 +34,7 @@ MODHOST_HOST = os.environ.get("MODHOST_HOST", "127.0.0.1")
 MODHOST_PORT = int(os.environ.get("MODHOST_PORT", "5555"))
 FEEDBACK_PORT = int(os.environ.get("MODHOST_FEEDBACK_PORT", "5556"))
 CHAIN_FILE = Path(os.environ.get("CHAIN_FILE", "/config/chain.yaml"))
+PRESETS_FILE = Path(os.environ.get("PRESETS_FILE", "") or CHAIN_FILE.with_name("presets.yaml"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 STATIC_DIR = Path(__file__).with_name("static")
 MAIN_CARD = os.environ.get("AUDIO_CARD", "")
@@ -54,10 +55,10 @@ def parse_value(v):
     return float(v)
 
 
-def slugify(text):
+def slugify(text, maxlen=24):
     t = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
     t = re.sub(r"[^a-z0-9]+", "-", t).strip("-")
-    return (t or "block")[:24].strip("-")
+    return (t or "block")[:maxlen].strip("-")
 
 
 # ----------------------------------------------------------------------------
@@ -89,6 +90,40 @@ class Factory:
     def blocks(self):
         return [{"id": s["id"], "uri": s["uri"], "bypass": s["bypass"], "params": dict(s["params"])}
                 for s in (self.specs[i] for i in self.order)]
+
+
+def load_builtin(factory: Factory, path: Path):
+    """Built-in presets (presets.yaml): each block starts from the factory block
+    with the same id and only overrides the parameters it lists."""
+    if not path.exists():
+        return []
+    try:
+        cfg = yaml.safe_load(path.read_text()) or {}
+    except yaml.YAMLError as e:
+        log.warning("invalid %s: %s", path, e)
+        return []
+    out = []
+    for p in cfg.get("presets", []):
+        blocks = []
+        try:
+            for b in p["blocks"]:
+                spec = factory.specs.get(b["id"])
+                uri = b.get("uri") or (spec and spec["uri"])
+                if not uri:
+                    raise ValueError(f"block {b['id']} has no uri")
+                params = dict(spec["params"]) if spec and spec["uri"] == uri else {}
+                params.update({k: parse_value(v) for k, v in (b.get("params") or {}).items()})
+                blk = {"id": b["id"], "uri": uri, "bypass": bool(b.get("bypass", False)), "params": params}
+                if b.get("name"):
+                    blk["name"] = b["name"]
+                blocks.append(blk)
+        except (KeyError, TypeError, ValueError) as e:
+            log.warning("built-in preset %r skipped: %s", p.get("name"), e)
+            continue
+        out.append({"slug": slugify(p["name"], 60), "name": p["name"], "mode": p.get("mode", ""),
+                    "radio": p.get("radio", ""), "description": p.get("description", ""),
+                    "state": {"version": STATE_VERSION, "chain_bypass": False, "blocks": blocks}})
+    return out
 
 
 # ----------------------------------------------------------------------------
@@ -847,7 +882,18 @@ async def h_library(request):
 
 async def h_presets(request):
     names = sorted(p.stem for p in presets_dir().glob("*.json"))
-    return web.json_response({"presets": names})
+    builtin = [{k: p[k] for k in ("slug", "name", "mode", "radio", "description")}
+               for p in request.app["builtin"]]
+    return web.json_response({"presets": names, "builtin": builtin})
+
+
+async def h_builtin_load(request):
+    slug = request.match_info["slug"]
+    for p in request.app["builtin"]:
+        if p["slug"] == slug:
+            await op_apply_state(request.app, copy.deepcopy(p["state"]))
+            return web.json_response({"ok": True})
+    return err("preset does not exist", 404)
 
 
 async def h_preset_save(request):
@@ -1032,6 +1078,7 @@ def make_app():
     lv2meta.reload()
     app = web.Application(middlewares=[auth_mw])
     app["factory"] = Factory(CHAIN_FILE)
+    app["builtin"] = load_builtin(app["factory"], PRESETS_FILE)
     saved = {}
     sf = DATA_DIR / "state.json"
     if sf.exists():
@@ -1055,6 +1102,7 @@ def make_app():
     r.add_get("/api/library", h_library)
     r.add_get("/api/presets", h_presets)
     r.add_post("/api/presets", h_preset_save)
+    r.add_post("/api/presets/builtin/{slug}/load", h_builtin_load)
     r.add_post("/api/presets/{name}/load", h_preset_load)
     r.add_delete("/api/presets/{name}", h_preset_delete)
     r.add_get("/api/cards", h_cards)

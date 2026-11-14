@@ -232,3 +232,5 @@ code { font-family: var(--mono); font-size: 12px; }
 .modal-box .lib-browser { flex: 1; }
 .lib-browser.in-tab .lib-list { max-height: none; overflow: visible; }
 .modal-box .lib-list { flex: 1; min-height: 120px; }
+.preset-info { font-size: 13px; line-height: 1.45; }
+.preset-info .small { margin-top: 4px; color: var(--muted); }

@@ -164,7 +164,23 @@ the radio. Use a foot switch on the rear PTT socket, VOX, or PTT over CAT/USB
   low-priority process), so it is exact for every filter type and mode. Works
   with LSP, Calf and x42 EQs; plugins that cannot be measured show a note.
 - **Presets**: *Save as…* stores the complete chain: order, blocks and values
-  (e.g. "SSB DX", "SSB ragchew"). Older presets still load.
+  (e.g. "SSB DX", "SSB ragchew"). Older presets still load. The list also has
+  **built-in presets** (read-only; load one, adjust it and save your own copy),
+  each with a description and the matching radio settings:
+
+  | Preset | Audio band (EQ + low-pass) | Character | On the radio |
+  |---|---|---|---|
+  | SSB DX / Contest | ~250 Hz – 2.6 kHz, +7 dB at 2.1 kHz | punchy, heavy compression | TX BPF 300-2700 or 400-2600 |
+  | SSB Ragchew | ~120 Hz – 2.9 kHz | natural, light compression | TX BPF 100-2900 or 200-2800 |
+  | ESSB Broadcast (wide) | ~60 Hz – 3.2 kHz | "presenter", warm + presence | TX BPF 50-3050 (or TTBF) |
+  | AM Broadcast (4.5 kHz) | ~80 Hz – 4.5 kHz | full, dense, 9 kHz channel | widest AM TX audio |
+  | FM Narrowband | ~300 Hz – 3 kHz, flat | clean, no treble boost (pre-emphasis) | normal deviation |
+  | Natural (minimal processing) | 80 Hz – full band | almost transparent | reference / FreeDV |
+
+  They are starting points: adjust them by ear on a second receiver or a
+  WebSDR, and turn the radio's own speech processor and TX EQ off so they do
+  not stack. Their definitions (and the sources of the curves) are in
+  `config/presets.yaml`.
 - **Reset values** (on a block) goes back to the `chain.yaml` values, or to the
   plugin defaults for blocks added from the UI. **Factory chain** restores the
   whole chain from `chain.yaml`.
@@ -205,6 +221,7 @@ has `PCM` and `Mic`.
 |---|---|
 | Change the order / add / remove blocks | in the UI (Chain tab) |
 | Change the factory chain | `config/chain.yaml` → `docker compose restart web` → *Factory chain* in the UI |
+| Change / add built-in presets | `config/presets.yaml` → `docker compose restart web` |
 | Get more plugins | Plugins tab (or `docker compose exec web ls /data/lv2/bundles`) |
 | Lower the latency | `.env`: `PERIOD=128` (watch the log for XRuns; USB cards usually need `NPERIODS=3`) |
 | See errors | `docker compose logs -f engine web` |

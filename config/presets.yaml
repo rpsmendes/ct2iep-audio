@@ -1,0 +1,222 @@
+# Built-in presets: complete chains tuned for a transmission mode.
+# They are read-only in the UI (load one, adjust it, "Save as…" your own).
+#
+# Each block refers to a block of the factory chain (chain.yaml) by id: it
+# starts from the factory values and only the parameters listed here change.
+# A block with an id that is not in chain.yaml needs its own "uri".
+# The order of the list is the signal order; blocks not listed are left out.
+# Gains can be written in dB ("-6dB"), as in chain.yaml.
+#
+# They are starting points, not final settings: every voice and microphone is
+# different. Adjust while listening on a second receiver or a WebSDR, and set
+# the level so the radio's ALC barely moves. Turn the radio's own speech
+# processor and TX EQ off (or flat) so they do not stack with this chain.
+#
+# References used for the curves:
+#  - ON4FF, "Microphone audio settings" (Yaesu/Flex/Icom DX and contest EQs):
+#    cut the lows, keep the mids flat, boost 2-2.4 kHz by 6-10 dB, TX
+#    bandwidth ~400-2600 Hz for contests.
+#  - NU9N, eSSB transmitter settings: 50 Hz to 3-4 kHz, FTDX101D TTBF option.
+#  - Radio World, "The 5 kHz AM reality": AM broadcast audio limited to
+#    4.5 kHz in Europe (9 kHz channels), 5 kHz common in the US.
+#  - FreeDV, "Getting started": turn all audio processing off for digital voice.
+
+presets:
+  - name: SSB DX / Contest
+    mode: SSB
+    radio: "SSB TX BPF 300-2700 (or 400-2600 Hz). Speech processor off."
+    description: >-
+      Maximum intelligibility and average power for weak-signal DX and
+      pile-ups: lows cut hard below 250 Hz, a dip at 500 Hz against
+      "boxiness", +7 dB of articulation around 2.1 kHz, heavier compression
+      and a 2.6 kHz upper limit. Sounds thin up close, punches through noise.
+    blocks:
+      - id: gate
+      - id: eq
+        params:
+          ft_0: 2   # Hi-pass 250 Hz, Butterworth x2 (24 dB/octave)
+          fm_0: 2
+          f_0: 250
+          s_0: 1
+          ft_1: 1   # Bell 500 Hz -4 dB
+          f_1: 500
+          g_1: "-4dB"
+          q_1: 1
+          ft_2: 1   # Bell 2.1 kHz +7 dB (articulation)
+          f_2: 2100
+          g_2: "7dB"
+          q_2: 0.8
+          ft_3: 0   # off
+      - id: comp
+        params: { al: "-30dB", cr: 6, kn: "-6dB", at: 5, rt: 80, mk: "11dB" }
+      - id: exciter
+        params: { amount: 1.5, drive: 6, freq: 2000 }
+      - id: deesser
+      - id: lpf
+        params: { f: 2600 }
+      - id: limiter
+
+  - name: SSB Ragchew
+    mode: SSB
+    radio: "SSB TX BPF 100-2900 or 200-2800 Hz. Speech processor off."
+    description: >-
+      Natural, comfortable voice for strong-signal QSOs: gentle high-pass at
+      120 Hz keeps some body, a small cut of the 300 Hz "mud", a little
+      presence at 1.8 kHz and light compression. Upper limit 2.9 kHz.
+    blocks:
+      - id: gate
+      - id: eq
+        params:
+          ft_0: 2   # Hi-pass 120 Hz, Butterworth x2
+          fm_0: 2
+          f_0: 120
+          s_0: 1
+          ft_1: 1   # Bell 300 Hz -2 dB
+          f_1: 300
+          g_1: "-2dB"
+          q_1: 1
+          ft_2: 1   # Bell 1.8 kHz +2 dB
+          f_2: 1800
+          g_2: "2dB"
+          q_2: 1
+          ft_3: 3   # Hi-shelf 2.4 kHz +1 dB
+          f_3: 2400
+          g_3: "1dB"
+      - id: comp
+        params: { al: "-22dB", cr: 3, kn: "-6dB", at: 10, rt: 150, mk: "5dB" }
+      - id: deesser
+      - id: lpf
+        params: { f: 2900 }
+      - id: limiter
+
+  - name: ESSB Broadcast (wide)
+    mode: SSB (wide)
+    radio: >-
+      SSB TX BPF 50-3050 Hz (or TTBF enabled, up to ~4 kHz: then raise the
+      low-pass to 3.8 kHz). Only where wide SSB is acceptable and the band
+      is not crowded.
+    description: >-
+      Broadcast-style "presenter" voice: high-pass at 60 Hz, a touch of warmth
+      at 120 Hz, the 300 Hz mud cut, an open presence lift around 3 kHz,
+      smooth compression with a slower attack, de-esser for the extra top end.
+      Upper limit 3.2 kHz.
+    blocks:
+      - id: gate
+        params: { gt: "-55dB", rt: 300 }
+      - id: eq
+        params:
+          ft_0: 2   # Hi-pass 60 Hz, Butterworth x1 (12 dB/octave)
+          fm_0: 2
+          f_0: 60
+          s_0: 0
+          ft_1: 5   # Lo-shelf 120 Hz +2 dB (warmth)
+          f_1: 120
+          g_1: "2dB"
+          ft_2: 1   # Bell 300 Hz -3 dB
+          f_2: 300
+          g_2: "-3dB"
+          q_2: 1
+          ft_3: 1   # Bell 3 kHz +3 dB (presence)
+          f_3: 3000
+          g_3: "3dB"
+          q_3: 0.7
+      - id: comp
+        params: { al: "-20dB", cr: 3, kn: "-6dB", at: 15, rt: 200, mk: "5dB" }
+      - id: deesser
+        params: { threshold: "-20dB", f2_freq: 4000 }
+      - id: lpf
+        params: { f: 3200 }
+      - id: limiter
+
+  - name: AM Broadcast (4.5 kHz)
+    mode: AM
+    radio: >-
+      AM with the radio's widest AM TX audio. Keep the carrier and the
+      modulation within the radio's limits (watch the ALC); a 4.5 kHz audio
+      limit gives the 9 kHz channel of European AM broadcasting.
+    description: >-
+      Full, "radio station" AM voice: 80 Hz high-pass, warmth at 150 Hz, a
+      little mud cut, presence at 2.5 kHz and air at 3.5 kHz, broadcast-style
+      compression for density, and a steep 4.5 kHz low-pass so the signal
+      stays inside a 9 kHz channel.
+    blocks:
+      - id: gate
+      - id: eq
+        params:
+          ft_0: 2   # Hi-pass 80 Hz, Butterworth x2
+          fm_0: 2
+          f_0: 80
+          s_0: 1
+          ft_1: 5   # Lo-shelf 150 Hz +2 dB
+          f_1: 150
+          g_1: "2dB"
+          ft_2: 1   # Bell 2.5 kHz +2 dB
+          f_2: 2500
+          g_2: "2dB"
+          q_2: 1
+          ft_3: 3   # Hi-shelf 3.5 kHz +2 dB
+          f_3: 3500
+          g_3: "2dB"
+      - id: comp
+        params: { al: "-24dB", cr: 4, kn: "-6dB", at: 10, rt: 250, mk: "7dB" }
+      - id: deesser
+        params: { f2_freq: 4000 }
+      - id: lpf
+        # 4.3 kHz: with the +2 dB shelf above, the total is -3 dB at ~4.5 kHz
+        params: { f: 4300 }
+      - id: limiter
+
+  - name: FM Narrowband
+    mode: FM
+    radio: >-
+      FM with the radio's normal (narrow) deviation. The radio adds
+      pre-emphasis (more treble) and its own deviation limiter: do not add
+      treble here.
+    description: >-
+      Clean voice for FM/repeaters: 300 Hz high-pass (keeps the sub-audible
+      CTCSS tones, 67-250 Hz, free of voice), flat mids, no treble boost because
+      the radio's pre-emphasis already adds it, de-esser against the extra
+      sibilance that pre-emphasis brings, gentle compression and a 3 kHz limit.
+    blocks:
+      - id: gate
+      - id: eq
+        params:
+          ft_0: 2   # Hi-pass 300 Hz, Butterworth x2
+          fm_0: 2
+          f_0: 300
+          s_0: 1
+          ft_1: 1   # Bell 500 Hz -2 dB
+          f_1: 500
+          g_1: "-2dB"
+          q_1: 1
+          ft_2: 0   # off
+          ft_3: 0   # off
+      - id: comp
+        params: { al: "-20dB", cr: 2.5, kn: "-6dB", at: 10, rt: 150, mk: "4dB" }
+      - id: deesser
+        params: { threshold: "-22dB" }
+      - id: lpf
+        params: { f: 3000 }
+      - id: limiter
+
+  - name: Natural (minimal processing)
+    mode: Reference / FreeDV
+    radio: >-
+      Use as a reference for A/B, or when this chain feeds a digital-voice
+      program (FreeDV/RADE), whose authors recommend turning all processing off.
+    description: >-
+      Almost transparent: noise gate, an 80 Hz high-pass against rumble and a
+      safety limiter at -6 dBFS. No EQ colour, compression or exciter.
+    blocks:
+      - id: gate
+      - id: eq
+        params:
+          ft_0: 2   # Hi-pass 80 Hz, Butterworth x1
+          fm_0: 2
+          f_0: 80
+          s_0: 0
+          ft_1: 0
+          ft_2: 0
+          ft_3: 0
+      - id: limiter
+        params: { th: "-6dB" }

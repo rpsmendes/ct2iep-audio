@@ -343,24 +343,53 @@ function updateMeters(values) {
 }
 
 // ---------- presets ----------
+// Option values: "b:<slug>" = built-in (config/presets.yaml, read-only),
+// "u:<name>" = saved by the user (data/presets).
+const PRESETS = { builtin: [] };
 async function loadPresets() {
   const r = await api("GET", "/api/presets");
+  PRESETS.builtin = r.builtin || [];
   const sel = $("#presetSel"); const cur = sel.value; sel.innerHTML = '<option value="">— preset —</option>';
-  for (const n of r.presets) { const o = el("option", null, n); o.value = n; sel.append(o); }
-  if (r.presets.includes(cur)) sel.value = cur;
+  const group = (label, items) => {
+    if (!items.length) return;
+    const g = el("optgroup"); g.label = label;
+    for (const [v, t] of items) { const o = el("option", null, t); o.value = v; g.append(o); }
+    sel.append(g);
+  };
+  group("Built-in", PRESETS.builtin.map(p => ["b:" + p.slug, p.mode ? `${p.name} · ${p.mode}` : p.name]));
+  group("Saved", r.presets.map(n => ["u:" + n, n]));
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  presetInfo();
 }
+function presetInfo() {
+  const v = $("#presetSel").value, box = $("#presetInfo");
+  const b = v.startsWith("b:") ? PRESETS.builtin.find(p => "b:" + p.slug === v) : null;
+  $("#presetDel").disabled = !v.startsWith("u:");
+  $("#presetDel").title = b ? "Built-in presets cannot be deleted" : "";
+  box.hidden = !b; box.innerHTML = "";
+  if (!b) return;
+  box.append(el("strong", null, b.name + (b.mode ? ` (${b.mode}). ` : ". ")), document.createTextNode(b.description + " "));
+  if (b.radio) { const r = el("div", "small"); r.append(el("strong", null, "On the radio: "), document.createTextNode(b.radio)); box.append(r); }
+}
+$("#presetSel").onchange = presetInfo;
 $("#presetLoad").onclick = async () => {
-  const n = $("#presetSel").value; if (!n) return;
-  try { await api("POST", `/api/presets/${encodeURIComponent(n)}/load`); toast(`Preset "${n}" loaded`); }
+  const v = $("#presetSel").value; if (!v) return;
+  const name = v.slice(2), builtin = v.startsWith("b:");
+  const url = builtin ? `/api/presets/builtin/${encodeURIComponent(name)}/load` : `/api/presets/${encodeURIComponent(name)}/load`;
+  const label = builtin ? PRESETS.builtin.find(p => p.slug === name)?.name : name;
+  try { await api("POST", url); toast(`Preset "${label}" loaded`); }
   catch (e) { toast(e.message); }
 };
 $("#presetSave").onclick = async () => {
-  const n = prompt("Preset name (e.g. SSB DX, SSB ragchew):", $("#presetSel").value || ""); if (!n) return;
-  try { await api("POST", "/api/presets", { name: n }); await loadPresets(); $("#presetSel").value = n; toast(`Saved "${n}" (order, blocks and values)`); }
+  const v = $("#presetSel").value;
+  const suggest = v.startsWith("u:") ? v.slice(2) : v.startsWith("b:") ? (PRESETS.builtin.find(p => "b:" + p.slug === v)?.name || "") + " mine" : "";
+  const n = prompt("Preset name (e.g. SSB DX, SSB ragchew):", suggest); if (!n) return;
+  try { await api("POST", "/api/presets", { name: n }); await loadPresets(); $("#presetSel").value = "u:" + n; presetInfo(); toast(`Saved "${n}" (order, blocks and values)`); }
   catch (e) { toast(e.message); }
 };
 $("#presetDel").onclick = async () => {
-  const n = $("#presetSel").value; if (!n || !confirm(`Delete preset "${n}"?`)) return;
+  const v = $("#presetSel").value; if (!v.startsWith("u:")) return;
+  const n = v.slice(2); if (!confirm(`Delete preset "${n}"?`)) return;
   await api("DELETE", `/api/presets/${encodeURIComponent(n)}`); loadPresets();
 };
 $("#abBtn").onclick = () => {
