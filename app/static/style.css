@@ -5,7 +5,7 @@
   --line: #333845;
   --text: #e4e6eb;
   --muted: #8b92a3;
-  --accent: #f2a541;      /* âmbar, tipo display de rádio */
+  --accent: #f2a541;      /* amber, like a radio display */
   --accent-dim: #7a5521;
   --ok: #4cc38a;
   --bad: #e5534b;
@@ -55,7 +55,7 @@ main { padding: 16px; max-width: 1400px; margin: 0 auto; }
   background-size: var(--w, 100%) 100%; transition: width 60ms linear; }
 .meter.gr .fill { left: auto; right: 0; background: var(--gr); }
 
-/* strip de blocos (estilo Waveform) */
+/* block strip (Waveform style) */
 .strip { display: flex; gap: 0; overflow-x: auto; padding: 4px 8px 10px; }
 .blk { position: relative; flex: 0 0 auto; min-width: 118px; max-width: 150px; margin-right: 10px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px 8px 10px;
@@ -89,7 +89,7 @@ button.icon { padding: 6px 9px; }
 button:disabled { opacity: .35; cursor: default; }
 button.danger:hover { border-color: var(--bad); color: var(--bad); }
 
-/* painel do bloco */
+/* block panel */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
 .panel h2 { margin: 0; font-size: 17px; }
 .panel .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
@@ -111,7 +111,7 @@ button.danger:hover { border-color: var(--bad); color: var(--bad); }
 .ctl .row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
 .ctl input[type=range] { flex: 1; accent-color: var(--accent); }
 
-/* slider próprio (arrasto relativo) */
+/* custom slider (relative drag) */
 .sl { flex: 1; min-width: 0; height: 26px; display: flex; align-items: center; cursor: ew-resize;
   touch-action: pan-y; outline: none; border-radius: 6px; }
 .sl .tr { position: relative; width: 100%; height: 6px; background: #0e1013; border-radius: 3px; }
@@ -126,7 +126,7 @@ button.danger:hover { border-color: var(--bad); color: var(--bad); }
 details.adv { margin-top: 14px; }
 details.adv summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
 
-/* gráfico de resposta em frequência */
+/* frequency-response graph */
 :root { --total: #5bc0be; }
 .graph { background: #121418; border: 1px solid var(--line); border-radius: 8px; padding: 8px 8px 6px; margin: 0 0 14px; }
 .graph-svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
@@ -147,7 +147,7 @@ details.adv summary { cursor: pointer; color: var(--muted); margin-bottom: 10px;
 .lg-total::before { border-top: 2px dashed var(--total); }
 .readout { font-family: var(--mono); font-size: 12px; }
 
-/* adicionar bloco */
+/* add block */
 .blk-add { flex: 0 0 auto; align-self: stretch; min-width: 52px; font-size: 22px; color: var(--muted);
   background: transparent; border: 1px dashed var(--line); border-radius: 6px; }
 .blk-add:hover { color: var(--accent); border-color: var(--accent-dim); }
@@ -176,7 +176,7 @@ p.small { margin: 2px 0; }
 .badge.base { color: var(--muted); }
 .badge.available { color: var(--accent); border-color: var(--accent-dim); }
 
-/* separador Plugins */
+/* Plugins tab */
 .packages { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
 .pkg { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
   display: flex; flex-direction: column; gap: 6px; }

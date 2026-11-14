@@ -1,13 +1,13 @@
 "use strict";
-// Núcleo da UI: estado, WebSocket, cadeia (blocos, painel, controlos), medidores,
-// presets e separadores. Funcionalidades extra registam-se em UI.* (ver fim).
+// UI core: state, WebSocket, chain (blocks, panel, controls), meters,
+// presets and tabs. Extra features register themselves in UI.* (see the end).
 
 const UI = {
-  chain: null,            // vista devolvida por /api/chain
-  selected: null,         // id do bloco selecionado
-  fine: false,            // ajuste fino ligado (útil em ecrãs táteis)
+  chain: null,            // view returned by /api/chain
+  selected: null,         // id of the selected block
+  fine: false,            // fine adjustment on (useful on touch screens)
   hooks: { panel: [], param: [], chain: [], stripTail: [], panelActions: [] },
-  tabs: {},               // nome -> { onShow }
+  tabs: {},               // name -> { onShow }
 };
 let ws = null;
 const $ = (s, el = document) => el.querySelector(s);
@@ -20,13 +20,13 @@ function toast(msg, ms = 2500) {
 }
 async function api(method, url, body) {
   const r = await fetch(url, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
-  let j = {}; try { j = await r.json(); } catch (_) { /* sem corpo */ }
+  let j = {}; try { j = await r.json(); } catch (_) { /* no body */ }
   if (!r.ok) { const e = new Error(j.error || `HTTP ${r.status}`); e.data = j; throw e; }
   return j;
 }
 
-// ---------- escalas dos controlos ----------
-// O slider trabalha numa posição 0..1; a escala converte posição <-> valor.
+// ---------- control scales ----------
+// The slider works on a 0..1 position; the scale converts position <-> value.
 const isGain = c => c.unit === "G";
 const db = v => 20 * Math.log10(v);
 const undb = d => Math.pow(10, d / 20);
@@ -37,7 +37,7 @@ function scaleOf(c) {
   if (isGain(c)) return "db";
   const logish = c.log || c.unit === "Hz" || TIME_UNITS.has(c.unit);
   if (logish && c.min > 0 && c.max > c.min) return "log";
-  if (logish && c.min === 0 && c.max > 0) return "plog";     // tempos que começam em 0
+  if (logish && c.min === 0 && c.max > 0) return "plog";     // times that start at 0
   return "lin";
 }
 function toPos(c, v) {
@@ -66,11 +66,11 @@ function fromPos(c, p) {
   if (c.integer) v = Math.round(v);
   return Math.min(c.max, Math.max(c.min, v));
 }
-// valor do plugin <-> valor mostrado (dB para ganhos)
+// plugin value <-> displayed value (dB for gains)
 const toDisp = (c, v) => isGain(c) ? (v <= 0 ? -Infinity : db(v)) : v;
 const fromDisp = (c, d) => isGain(c) ? (d === -Infinity ? 0 : undb(d)) : d;
 
-// passo de teclado/roda: ganhos em dB, o resto na posição do slider
+// keyboard/wheel step: gains in dB, everything else in slider position
 function nudge(c, v, dir, fine, big) {
   const mult = big ? 10 : 1;
   if (c.enum || c.integer || c.toggle) return Math.min(c.max, Math.max(c.min, Math.round(v) + dir * mult));
@@ -94,9 +94,9 @@ function fmt(c, v) {
   return fmtNum(v, u) + (u ? " " + u : "");
 }
 
-// ---------- slider com arrasto relativo ----------
-// Clicar não muda o valor (seguro em TX); arrastar ajusta ~2,5x mais devagar
-// que o rato; Shift/Alt ou "Ajuste fino" = 10x mais fino; duplo clique = defeito.
+// ---------- slider with relative drag ----------
+// Clicking does not change the value (safe on TX); dragging moves ~2.5x slower
+// than the mouse; Shift/Alt or "Fine" = 10x finer; double click = default.
 function makeSlider(c, value, onChange, defaultValue) {
   const root = el("div", "sl"); root.tabIndex = 0; root.setAttribute("role", "slider");
   root.setAttribute("aria-label", c.name);
@@ -116,7 +116,7 @@ function makeSlider(c, value, onChange, defaultValue) {
   root.addEventListener("pointermove", e => {
     if (!drag) return;
     const fine = UI.fine || e.shiftKey || e.altKey;
-    if (drag.fine !== null && fine !== drag.fine) { drag.x = e.clientX; drag.pos = pos; }  // muda o modo a meio
+    if (drag.fine !== null && fine !== drag.fine) { drag.x = e.clientX; drag.pos = pos; }  // mode changed mid-drag
     drag.fine = fine;
     const dx = e.clientX - drag.x;
     if (!drag.moved && Math.abs(dx) < 3) return;
@@ -128,7 +128,7 @@ function makeSlider(c, value, onChange, defaultValue) {
   const end = e => {
     if (!drag) return;
     drag = null; root.classList.remove("active");
-    try { root.releasePointerCapture(e.pointerId); } catch (_) { /* já libertado */ }
+    try { root.releasePointerCapture(e.pointerId); } catch (_) { /* already released */ }
     UI.busy = Math.max(0, (UI.busy || 1) - 1); if (!UI.busy) flushDeferred();
   };
   root.addEventListener("pointerup", end);
@@ -142,7 +142,7 @@ function makeSlider(c, value, onChange, defaultValue) {
     e.preventDefault();
     setValue(nudge(c, cur, map[e.key], UI.fine || e.shiftKey, e.key.startsWith("Page")), true);
   });
-  // a roda só atua com o slider focado (não muda valores por acidente ao fazer scroll)
+  // the wheel only acts on a focused slider (no accidental changes while scrolling)
   root.addEventListener("wheel", e => {
     if (document.activeElement !== root) return;
     e.preventDefault();
@@ -155,7 +155,7 @@ function makeSlider(c, value, onChange, defaultValue) {
 function connectWS() {
   ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
   ws.onmessage = ev => handle(JSON.parse(ev.data));
-  ws.onclose = () => { setStatus(false, "sem ligação ao servidor"); setTimeout(connectWS, 2000); };
+  ws.onclose = () => { setStatus(false, "no connection to the server"); setTimeout(connectWS, 2000); };
   ws.onopen = () => loadChain();
 }
 function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
@@ -165,9 +165,9 @@ function flushDeferred() { if (deferredChain) { const c = deferredChain; deferre
 
 function handle(m) {
   switch (m.type) {
-    case "status": setStatus(m.online, m.online ? "motor ativo" : "motor de áudio parado"); break;
+    case "status": setStatus(m.online, m.online ? "engine running" : "audio engine stopped"); break;
     case "chain":
-      if (UI.busy) deferredChain = m.chain;           // não estragar um arrasto em curso
+      if (UI.busy) deferredChain = m.chain;           // do not break a drag in progress
       else applyChain(m.chain);
       break;
     case "param": {
@@ -180,16 +180,16 @@ function handle(m) {
     case "bypass": { const b = blockById(m.block); if (b) b.bypass = m.value; renderStrip(); if (UI.selected === m.block) renderPanel(); UI.hooks.param.forEach(f => f(b)); break; }
     case "chain_bypass": UI.chain.chain_bypass = m.value; renderStrip(); UI.hooks.param.forEach(f => f(null)); break;
     case "meters": updateMeters(m.values); break;
-    case "error": toast("Erro: " + m.message); break;
+    case "error": toast("Error: " + m.message); break;
   }
 }
 function setStatus(on, text) { $("#dot").classList.toggle("on", !!on); $("#statusText").textContent = text; }
 
-// ---------- cadeia ----------
+// ---------- chain ----------
 function applyChain(v) {
   UI.chain = v;
   if (!UI.selected || !blockById(UI.selected)) UI.selected = v.blocks[0]?.id || null;
-  setStatus(v.online, v.online ? "motor ativo" : "motor de áudio parado");
+  setStatus(v.online, v.online ? "engine running" : "audio engine stopped");
   renderMeters(); renderStrip(); renderPanel();
   UI.hooks.chain.forEach(f => f(v));
 }
@@ -206,8 +206,8 @@ function renderStrip() {
     const off = b.bypass || UI.chain.chain_bypass;
     const d = el("div", "blk" + (b.id === UI.selected ? " sel" : "") + (off ? " off" : "") + (b.error || b.missing ? " bad" : ""));
     d.dataset.id = b.id;
-    d.append(el("div", "n", b.name), el("div", "r", b.missing ? "plugin não instalado" : b.error ? "erro ao carregar" : (b.replaces || b.plugin)));
-    const pw = el("button", "pw", "⏻"); pw.title = b.bypass ? "Ligar" : "Bypass"; pw.setAttribute("aria-label", pw.title);
+    d.append(el("div", "n", b.name), el("div", "r", b.missing ? "plugin not installed" : b.error ? "failed to load" : (b.replaces || b.plugin)));
+    const pw = el("button", "pw", "⏻"); pw.title = b.bypass ? "Switch on" : "Bypass"; pw.setAttribute("aria-label", pw.title);
     pw.onclick = e => { e.stopPropagation(); setBypass(b, !b.bypass); };
     d.append(pw);
     d.onclick = () => select(b.id);
@@ -220,29 +220,29 @@ function setBypass(b, val) {
   renderStrip(); if (UI.selected === b.id) renderPanel(); UI.hooks.param.forEach(f => f(b));
 }
 
-// ---------- painel do bloco ----------
+// ---------- block panel ----------
 const ctlEls = {};
 function renderPanel() {
   const p = $("#panel"); p.innerHTML = ""; for (const k in ctlEls) delete ctlEls[k];
   const b = blockById(UI.selected);
-  if (!b) { p.append(el("div", "muted", "Cadeia vazia.")); return; }
+  if (!b) { p.append(el("div", "muted", "The chain is empty.")); return; }
   const head = el("div", "head");
   const h = el("div");
-  const sub = [b.plugin, b.replaces ? "substitui: " + b.replaces : "", b.bypass ? "EM BYPASS" : ""].filter(Boolean).join(" · ");
+  const sub = [b.plugin, b.replaces ? "replaces: " + b.replaces : "", b.bypass ? "BYPASSED" : ""].filter(Boolean).join(" · ");
   h.append(el("h2", null, b.name), el("div", "muted", sub));
   const actions = el("div", "actions");
   const fineLbl = el("label", "fine"); const fineCb = el("input"); fineCb.type = "checkbox"; fineCb.checked = UI.fine;
   fineCb.onchange = () => { UI.fine = fineCb.checked; };
-  fineLbl.append(fineCb, document.createTextNode(" Ajuste fino")); fineLbl.title = "Arrasto e teclado 10x mais finos (o mesmo que manter Shift)";
+  fineLbl.append(fineCb, document.createTextNode(" Fine")); fineLbl.title = "Drag and keyboard 10x finer (same as holding Shift)";
   actions.append(fineLbl);
   UI.hooks.panelActions.forEach(f => f(b, actions));
-  const reset = el("button", "ghost", "Repor valores"); reset.title = "Volta aos valores do chain.yaml (ou aos do plugin)";
-  reset.onclick = async () => { if (confirm(`Repor os valores de "${b.name}"?`)) await api("POST", `/api/reset?block=${encodeURIComponent(b.id)}`); };
+  const reset = el("button", "ghost", "Reset values"); reset.title = "Back to the chain.yaml values (or the plugin defaults)";
+  reset.onclick = async () => { if (confirm(`Reset the values of "${b.name}"?`)) await api("POST", `/api/reset?block=${encodeURIComponent(b.id)}`); };
   actions.append(reset);
   head.append(h, actions); p.append(head);
 
   if (b.missing || b.error) {
-    p.append(el("div", "note warn", b.missing ? "O plugin deste bloco não está instalado. Instala o pacote no separador Plugins ou remove o bloco." : `Este bloco não foi carregado: ${b.error}.`));
+    p.append(el("div", "note warn", b.missing ? "This block's plugin is not installed. Install its package in the Plugins tab or remove the block." : `This block was not loaded: ${b.error}.`));
     if (b.missing) return;
   }
   UI.hooks.panel.forEach(f => f(b, p));
@@ -250,17 +250,17 @@ function renderPanel() {
   const byS = Object.fromEntries(b.controls.map(c => [c.symbol, c]));
   const main = el("div", "grid");
   for (const s of b.main) if (byS[s]) main.append(makeControl(b, byS[s]));
-  if (!b.main.length) main.append(el("div", "muted", "Sem parâmetros principais definidos: vê Avançado."));
+  if (!b.main.length) main.append(el("div", "muted", "No main parameters defined: see Advanced."));
   p.append(main);
 
   const rest = b.controls.filter(c => !b.main.includes(c.symbol));
   if (rest.length) {
-    const det = el("details", "adv"); det.append(el("summary", null, `Avançado (${rest.length} parâmetros)`));
+    const det = el("details", "adv"); det.append(el("summary", null, `Advanced (${rest.length} parameters)`));
     const g = el("div", "grid"); det.append(g);
     det.addEventListener("toggle", () => { if (det.open && !g.childElementCount) for (const c of rest) g.append(makeControl(b, c)); });
     p.append(det);
   }
-  p.append(el("p", "hint", "Arrastar ajusta (clicar não muda o valor) · Shift ou “Ajuste fino” = 10× mais fino · setas do teclado com o slider selecionado · duplo clique = valor por defeito"));
+  p.append(el("p", "hint", "Drag to adjust (clicking does not change the value) · Shift or “Fine” = 10× finer · arrow keys on the focused slider · double click = default value"));
 }
 
 function makeControl(b, c) {
@@ -278,14 +278,14 @@ function makeControl(b, c) {
     ctlEls[c.symbol] = { set: v => { sel.value = String(v); } };
   } else if (c.toggle) {
     const cb = el("input"); cb.type = "checkbox"; cb.checked = value >= 0.5; cb.className = "sw"; cb.setAttribute("aria-label", c.name);
-    const txt = v => (v >= 0.5 ? "ligado" : "desligado");
+    const txt = v => (v >= 0.5 ? "on" : "off");
     val.textContent = txt(value);
     cb.onchange = () => { commit(cb.checked ? c.max : c.min); val.textContent = txt(cb.checked ? 1 : 0); };
     box.append(cb);
     ctlEls[c.symbol] = { set: v => { cb.checked = v >= 0.5; val.textContent = txt(v); } };
   } else {
     const row = el("div", "row");
-    const n = el("input"); n.type = "number"; n.step = "any"; n.setAttribute("aria-label", c.name + " (valor)");
+    const n = el("input"); n.type = "number"; n.step = "any"; n.setAttribute("aria-label", c.name + " (value)");
     const setN = v => { const d = toDisp(c, v); n.value = isFinite(d) ? +d.toFixed(isGain(c) ? 1 : 3) : ""; };
     const sl = makeSlider(c, value, v => { setN(v); commit(v); }, b.defaults[c.symbol]);
     setN(value);
@@ -312,7 +312,7 @@ function sendThrottled(block, symbol, value) {
   if (!flushT) flushT = setTimeout(() => { for (const k in pending) { send(pending[k]); delete pending[k]; } flushT = null; }, 40);
 }
 
-// ---------- medidores ----------
+// ---------- meters ----------
 const meterEls = {};
 function renderMeters() {
   const m = $("#meters"); m.innerHTML = ""; for (const k in meterEls) delete meterEls[k];
@@ -350,16 +350,16 @@ async function loadPresets() {
 }
 $("#presetLoad").onclick = async () => {
   const n = $("#presetSel").value; if (!n) return;
-  try { await api("POST", `/api/presets/${encodeURIComponent(n)}/load`); toast(`Preset "${n}" carregado`); }
+  try { await api("POST", `/api/presets/${encodeURIComponent(n)}/load`); toast(`Preset "${n}" loaded`); }
   catch (e) { toast(e.message); }
 };
 $("#presetSave").onclick = async () => {
-  const n = prompt("Nome do preset (ex.: SSB DX, SSB ragchew):", $("#presetSel").value || ""); if (!n) return;
-  try { await api("POST", "/api/presets", { name: n }); await loadPresets(); $("#presetSel").value = n; toast(`Guardado "${n}" (ordem, blocos e valores)`); }
+  const n = prompt("Preset name (e.g. SSB DX, SSB ragchew):", $("#presetSel").value || ""); if (!n) return;
+  try { await api("POST", "/api/presets", { name: n }); await loadPresets(); $("#presetSel").value = n; toast(`Saved "${n}" (order, blocks and values)`); }
   catch (e) { toast(e.message); }
 };
 $("#presetDel").onclick = async () => {
-  const n = $("#presetSel").value; if (!n || !confirm(`Apagar o preset "${n}"?`)) return;
+  const n = $("#presetSel").value; if (!n || !confirm(`Delete preset "${n}"?`)) return;
   await api("DELETE", `/api/presets/${encodeURIComponent(n)}`); loadPresets();
 };
 $("#abBtn").onclick = () => {
@@ -367,16 +367,16 @@ $("#abBtn").onclick = () => {
   renderStrip(); UI.hooks.param.forEach(f => f(null));
 };
 $("#factoryReset")?.addEventListener("click", async () => {
-  if (!confirm("Repor a cadeia de fábrica (config/chain.yaml)? A ordem, os blocos e os valores atuais perdem-se (guarda um preset antes, se quiseres).")) return;
-  try { await api("POST", "/api/reset"); toast("Cadeia de fábrica reposta"); } catch (e) { toast(e.message); }
+  if (!confirm("Restore the factory chain (config/chain.yaml)? The current order, blocks and values will be lost (save a preset first if you want to keep them).")) return;
+  try { await api("POST", "/api/reset"); toast("Factory chain restored"); } catch (e) { toast(e.message); }
 });
 
-// ---------- separadores ----------
+// ---------- tabs ----------
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
   document.querySelectorAll("main > section").forEach(s => { s.hidden = s.id !== "tab-" + t.dataset.tab; });
   UI.tabs[t.dataset.tab]?.onShow?.();
 });
 
-// os módulos extra (graph.js, library.js, …) carregam depois deste e registam-se em UI.hooks
+// the extra modules (chain-edit.js, graph.js, plugins.js, card.js) load after this one and register in UI.hooks
 window.addEventListener("load", connectWS);

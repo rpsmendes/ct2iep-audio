@@ -1,7 +1,7 @@
 "use strict";
-// Gráfico da resposta em frequência para blocos de EQ/filtro.
-// A curva é calculada no servidor com o próprio plugin (/api/response):
-// linha cheia = este bloco; tracejado = soma de todos os EQ/filtros ativos.
+// Frequency-response graph for EQ/filter blocks.
+// The curve is computed on the server with the plugin itself (/api/response):
+// solid line = this block; dashed = sum of all active EQs/filters.
 
 const G = {
   W: 720, H: 230, padL: 38, padR: 12, padT: 12, padB: 24,
@@ -17,20 +17,20 @@ const fLabel = f => f >= 1000 ? (f / 1000) + "k" : String(f);
 
 function graphShell(b) {
   const box = el("div", "graph");
-  const svg = sv("svg", { viewBox: `0 0 ${G.W} ${G.H}`, role: "img", "aria-label": `Resposta em frequência de ${b.name}` });
+  const svg = sv("svg", { viewBox: `0 0 ${G.W} ${G.H}`, role: "img", "aria-label": `Frequency response of ${b.name}` });
   svg.classList.add("graph-svg");
   box.append(svg);
   const foot = el("div", "graph-foot");
   const legend = el("div", "legend");
-  legend.innerHTML = '<span class="lg lg-block">Este bloco</span><span class="lg lg-total">Total dos EQ/filtros</span>';
-  const read = el("div", "readout muted", "Passa o rato no gráfico para ler valores");
+  legend.innerHTML = '<span class="lg lg-block">This block</span><span class="lg lg-total">All EQs/filters</span>';
+  const read = el("div", "readout muted", "Hover over the graph to read values");
   foot.append(legend, read);
   box.append(foot);
   return box;
 }
 
 function drawGrid(svg) {
-  // desenha à largura real (1 unidade = 1 px): texto sempre do mesmo tamanho
+  // draw at the real width (1 unit = 1 px): text always has the same size
   const w = svg.parentElement ? svg.parentElement.clientWidth - 16 : 0;
   G.W = Math.max(300, w || G.W);
   G.H = G.W < 520 ? 190 : 240;
@@ -43,7 +43,7 @@ function drawGrid(svg) {
   const [a, b] = G.ssb;
   svg.append(sv("rect", { class: "g-band", x: gx(a), y: G.padT, width: gx(b) - gx(a), height: G.H - G.padT - G.padB }));
   const t = sv("text", { class: "g-band-label", x: (gx(a) + gx(b)) / 2, y: G.padT + 11, "text-anchor": "middle" });
-  t.textContent = "banda SSB"; svg.append(t);
+  t.textContent = "SSB band"; svg.append(t);
   const ticks = G.W < 520 ? [100, 300, 1000, 3000, 10000] : [50, 100, 200, 500, 1000, 2000, 5000, 10000];
   for (const f of ticks) {
     svg.append(sv("line", { class: "g-grid", x1: gx(f), x2: gx(f), y1: G.padT, y2: G.H - G.padB }));
@@ -69,9 +69,9 @@ function drawCurves(box, data) {
   g.append(cursor); svg.append(g);
   const lgT = box.querySelector(".lg-total");
   lgT.hidden = !data.total;
-  if (data.total) lgT.textContent = `Total dos EQ/filtros (${data.parts.length})`;
+  if (data.total) lgT.textContent = `All EQs/filters (${data.parts.length})`;
   lgT.title = data.parts.join(", ");
-  box.querySelector(".lg-block").textContent = data.bypassed ? "Este bloco (em bypass)" : "Este bloco";
+  box.querySelector(".lg-block").textContent = data.bypassed ? "This block (bypassed)" : "This block";
 
   const read = box.querySelector(".readout");
   const pick = ev => {
@@ -100,7 +100,7 @@ async function refreshGraph() {
     const data = await api("GET", `/api/response?block=${encodeURIComponent(b.id)}`);
     if (UI.selected === b.id && document.querySelector("#panel .graph") === box) { G.data = { ...data, blockId: b.id }; drawCurves(box, data); }
   } catch (e) {
-    box.querySelector(".readout").textContent = "Gráfico indisponível: " + e.message;
+    box.querySelector(".readout").textContent = "Graph unavailable: " + e.message;
   } finally {
     G.inflight = false;
     if (G.again) { G.again = false; scheduleGraph(0); }
@@ -116,10 +116,10 @@ UI.hooks.panel.push((b, panel) => {
     if (G.data && G.data.blockId === b.id) drawCurves(box, G.data);
     scheduleGraph(0);
   } else if (b.graph_unsupported) {
-    panel.append(el("p", "hint", "Gráfico indisponível para este plugin: não é possível medi-lo offline (portas que o lv2apply não suporta)."));
+    panel.append(el("p", "hint", "No graph for this plugin: it cannot be measured offline (it has ports that lv2apply does not support)."));
   }
 });
-// qualquer alteração num EQ/filtro muda o total; bypass (b null = bypass total) também
+// any change in an EQ/filter changes the total; so does bypass (b null = bypass all)
 UI.hooks.param.push(b => {
   const sel = blockById(UI.selected);
   if (sel && sel.graph && (!b || b.graph)) scheduleGraph();

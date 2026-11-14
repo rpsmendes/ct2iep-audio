@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,83 +10,83 @@
 <body>
 <header>
   <div class="brand"><span class="call">CT2IEP</span> <span class="sub">TX Audio</span></div>
-  <div class="status"><span id="dot" class="dot"></span><span id="statusText">a ligar…</span></div>
+  <div class="status"><span id="dot" class="dot"></span><span id="statusText">connecting…</span></div>
   <nav>
-    <button class="tab active" data-tab="chain">Cadeia</button>
+    <button class="tab active" data-tab="chain">Chain</button>
     <button class="tab" data-tab="plugins">Plugins</button>
-    <button class="tab" data-tab="card">Placa</button>
+    <button class="tab" data-tab="card">Card</button>
   </nav>
 </header>
 
 <main>
   <section id="tab-chain">
     <div class="toolbar">
-      <button id="abBtn" class="ab" title="Desliga todos os blocos para comparar">A/B · Bypass total</button>
+      <button id="abBtn" class="ab" title="Switches every block off to compare with the original sound">A/B · Bypass all</button>
       <div class="presets">
-        <select id="presetSel"><option value="">— preset —</option></select>
-        <button id="presetLoad">Carregar</button>
-        <button id="presetSave">Guardar como…</button>
-        <button id="presetDel" class="ghost">Apagar</button>
-        <button id="factoryReset" class="ghost" title="Volta à cadeia do config/chain.yaml (ordem, blocos e valores)">Cadeia de fábrica</button>
+        <select id="presetSel" aria-label="Preset"><option value="">— preset —</option></select>
+        <button id="presetLoad">Load</button>
+        <button id="presetSave">Save as…</button>
+        <button id="presetDel" class="ghost">Delete</button>
+        <button id="factoryReset" class="ghost" title="Restores the chain from config/chain.yaml (order, blocks and values)">Factory chain</button>
       </div>
     </div>
 
     <div id="meters" class="meters"></div>
 
     <div id="strip" class="strip"></div>
-    <p class="hint">Arrasta a pega <span class="kbd">⋮⋮</span> de um bloco para mudar a ordem. O botão ⏻ liga/desliga o bloco.</p>
+    <p class="hint">Drag a block by its <span class="kbd">⋮⋮</span> handle to change the order. The ⏻ button switches a block on/off.</p>
 
     <div id="panel" class="panel"></div>
   </section>
 
   <section id="tab-plugins" hidden>
     <div class="toolbar">
-      <div><strong>Pacotes de plugins</strong> <span id="libCount" class="muted"></span></div>
-      <button id="pkgRefresh">Atualizar</button>
+      <div><strong>Plugin packages</strong> <span id="libCount" class="muted"></span></div>
+      <button id="pkgRefresh">Refresh</button>
     </div>
-    <p class="note warn">Instalar ou remover um pacote reinicia o motor de áudio (cerca de 2 s sem áudio).
-      Não o faças durante uma emissão. Os plugins instalados aqui ficam em <code>data/lv2</code> e
-      sobrevivem a atualizações da imagem. Para os usar, carrega no <strong>+</strong> no fim da cadeia.</p>
+    <p class="note warn">Installing or removing a package restarts the audio engine (about 2 s without audio).
+      Do not do it while transmitting. Plugins installed here live in <code>data/lv2</code> and
+      survive image updates. To use them, press <strong>+</strong> at the end of the chain.</p>
     <div id="packages" class="packages"></div>
     <div class="custom-pkg">
-      <label for="customPkg">Outro pacote Debian com plugins LV2</label>
+      <label for="customPkg">Another Debian package with LV2 plugins</label>
       <div class="row">
-        <input id="customPkg" type="text" placeholder="ex.: guitarix-lv2" autocomplete="off" spellcheck="false">
-        <button id="customInstall">Instalar</button>
+        <input id="customPkg" type="text" placeholder="e.g. guitarix-lv2" autocomplete="off" spellcheck="false">
+        <button id="customInstall">Install</button>
       </div>
     </div>
-    <details id="pkgLogBox" class="cards" hidden><summary>Registo da última operação</summary><pre id="pkgLog"></pre></details>
+    <details id="pkgLogBox" class="cards" hidden><summary>Log of the last operation</summary><pre id="pkgLog"></pre></details>
   </section>
 
   <section id="tab-card" hidden>
     <div class="toolbar">
       <div class="row">
-        <label for="cardSel"><strong>Placa</strong></label>
+        <label for="cardSel"><strong>Card</strong></label>
         <select id="cardSel"></select>
       </div>
-      <button id="mixerRefresh">Atualizar</button>
+      <button id="mixerRefresh">Refresh</button>
     </div>
     <div id="mixerNote" class="note" hidden></div>
     <div id="mixer" class="mixer"></div>
-    <h3 class="section-title">Interfaces de áudio detetadas</h3>
+    <h3 class="section-title">Detected audio interfaces</h3>
     <div id="cardList" class="card-list"></div>
-    <details class="cards"><summary>Saída do aplay -l / arecord -l</summary><pre id="cardsRaw"></pre></details>
+    <details class="cards"><summary>Output of aplay -l / arecord -l</summary><pre id="cardsRaw"></pre></details>
   </section>
 </main>
 
-<!-- Biblioteca de plugins (adicionar bloco) -->
+<!-- Plugin library (add a block) -->
 <div id="libModal" class="modal" hidden>
   <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="libTitle">
     <div class="modal-head">
-      <h2 id="libTitle">Adicionar plugin à cadeia</h2>
-      <button id="libClose" class="ghost" aria-label="Fechar">✕</button>
+      <h2 id="libTitle">Add a plugin to the chain</h2>
+      <button id="libClose" class="ghost" aria-label="Close">✕</button>
     </div>
     <div class="lib-filters">
-      <input id="libSearch" type="search" placeholder="Procurar (nome, autor, tipo)…" autocomplete="off">
-      <select id="libClass" aria-label="Tipo"><option value="">Todos os tipos</option></select>
+      <input id="libSearch" type="search" placeholder="Search (name, author, type)…" autocomplete="off">
+      <select id="libClass" aria-label="Type"><option value="">All types</option></select>
     </div>
     <p id="libWhere" class="muted small"></p>
-    <p class="muted small">A cadeia é mono: nos plugins estéreo entra o mesmo sinal nos dois canais e segue só o canal esquerdo. Entradas de sidechain ficam desligadas.</p>
+    <p class="muted small">The chain is mono: stereo plugins get the same signal on both inputs and only the left output continues. Sidechain inputs are left unconnected.</p>
     <div id="libList" class="lib-list"></div>
   </div>
 </div>

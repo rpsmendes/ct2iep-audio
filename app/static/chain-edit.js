@@ -1,14 +1,14 @@
 "use strict";
-// Edição da cadeia: arrastar blocos para mudar a ordem (pega ⋮⋮), mover com
-// ◀ ▶ no painel e remover blocos. Depende de app.js (UI, api, el, toast…).
+// Chain editing: drag blocks to change the order (⋮⋮ handle), move them with
+// ◀ ▶ in the panel and remove blocks. Depends on app.js (UI, api, el, toast…).
 
 async function sendOrder(ids) {
-  // otimista: reordena já na UI; o servidor confirma com uma mensagem "chain"
+  // optimistic: reorder in the UI right away; the server confirms with a "chain" message
   const map = Object.fromEntries(UI.chain.blocks.map(b => [b.id, b]));
   UI.chain.blocks = ids.map(i => map[i]);
   renderStrip(); renderMeters();
   try { await api("POST", "/api/chain/order", { order: ids }); }
-  catch (e) { toast("Não foi possível mudar a ordem: " + e.message); loadChain(); }
+  catch (e) { toast("Could not change the order: " + e.message); loadChain(); }
 }
 
 function startDrag(e, blk, strip) {
@@ -34,7 +34,7 @@ function startDrag(e, blk, strip) {
     blk.style.transform = `translateX(${lastX - startX + (strip.scrollLeft - startScroll)}px)`;
     mark(lastX);
   };
-  // desliza a faixa quando se arrasta junto às margens
+  // scroll the strip while dragging near its edges
   const autoscroll = () => {
     const r = strip.getBoundingClientRect();
     const v = lastX < r.left + 48 ? -14 : lastX > r.right - 48 ? 14 : 0;
@@ -62,18 +62,18 @@ function startDrag(e, blk, strip) {
   grip.addEventListener("pointercancel", end);
 }
 
-// pega ⋮⋮ em cada bloco da faixa
+// ⋮⋮ handle on every block of the strip
 UI.hooks.stripTail.push(strip => {
   strip.querySelectorAll(".blk").forEach(blk => {
     const g = el("span", "grip", "⋮⋮");
-    g.title = "Arrastar para mudar a ordem";
+    g.title = "Drag to change the order";
     g.addEventListener("pointerdown", e => startDrag(e, blk, strip));
     g.addEventListener("click", e => e.stopPropagation());
     blk.prepend(g); blk.classList.add("has-grip");
   });
 });
 
-// ◀ ▶ e Remover no painel do bloco
+// ◀ ▶ and Remove in the block panel
 UI.hooks.panelActions.push((b, actions) => {
   const ids = UI.chain.blocks.map(x => x.id);
   const i = ids.indexOf(b.id);
@@ -83,14 +83,14 @@ UI.hooks.panelActions.push((b, actions) => {
     btn.onclick = () => { const n = ids.slice(); n.splice(i, 1); n.splice(i + dir, 0, b.id); sendOrder(n); };
     return btn;
   };
-  const rm = el("button", "ghost danger", "Remover");
-  rm.title = "Tirar este bloco da cadeia";
+  const rm = el("button", "ghost danger", "Remove");
+  rm.title = "Take this block out of the chain";
   rm.onclick = async () => {
-    if (!confirm(`Remover "${b.name}" da cadeia?`)) return;
+    if (!confirm(`Remove "${b.name}" from the chain?`)) return;
     const next = UI.chain.blocks[i + 1]?.id || UI.chain.blocks[i - 1]?.id || null;
-    UI.selected = next;              // a mensagem "chain" do servidor já chega com este selecionado
-    try { await api("DELETE", `/api/chain/blocks/${encodeURIComponent(b.id)}`); toast(`"${b.name}" removido`); }
+    UI.selected = next;              // the server's "chain" message then arrives with this one selected
+    try { await api("DELETE", `/api/chain/blocks/${encodeURIComponent(b.id)}`); toast(`"${b.name}" removed`); }
     catch (e) { UI.selected = b.id; toast(e.message); }
   };
-  actions.append(mv(-1, "◀", "Mover para trás na cadeia"), mv(1, "▶", "Mover para a frente na cadeia"), rm);
+  actions.append(mv(-1, "◀", "Move earlier in the chain"), mv(1, "▶", "Move later in the chain"), rm);
 });

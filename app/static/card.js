@@ -1,10 +1,10 @@
 "use strict";
-// Separador Placa: interfaces de áudio detetadas (aplay -l / arecord -l) e
-// mixer ALSA da placa escolhida. Dentro do Docker o /proc/asound não existe,
-// por isso a lista vem das ferramentas ALSA (que usam /dev/snd).
+// Card tab: detected audio interfaces (aplay -l / arecord -l) and the ALSA
+// mixer of the chosen card. /proc/asound does not exist inside Docker, so the
+// list comes from the ALSA tools (which use /dev/snd).
 
 const CARD = { list: [], current: null };
-try { CARD.current = localStorage.getItem("ct2iep.card"); } catch (_) { /* sem storage */ }
+try { CARD.current = localStorage.getItem("ct2iep.card"); } catch (_) { /* no storage */ }
 
 async function loadCards() {
   const r = await api("GET", "/api/cards");
@@ -21,16 +21,16 @@ async function loadCards() {
 
   const list = $("#cardList"); list.innerHTML = "";
   if (!r.cards.length) {
-    list.append(el("p", "muted", "Nenhuma placa de áudio encontrada. Confirma que o contentor tem acesso a /dev/snd e que a placa está ligada."));
+    list.append(el("p", "muted", "No sound card found. Check that the container has access to /dev/snd and that the card is connected."));
   }
   for (const c of r.cards) {
     const d = el("div", "card-item" + (c.id === r.default ? " main" : ""));
     const h = el("div", "card-title");
-    h.append(el("strong", null, c.id), el("span", "muted", ` ${c.name} · placa ${c.index}`));
-    if (c.id === r.default) h.append(el("span", "badge installed", "placa da cadeia"));
+    h.append(el("strong", null, c.id), el("span", "muted", ` ${c.name} · card ${c.index}`));
+    if (c.id === r.default) h.append(el("span", "badge installed", "chain card"));
     d.append(h);
     const fmtDev = (arr, label) => arr.length ? `${label}: ${arr.map(x => `hw:${c.id},${x.device} (${x.name})`).join(", ")}` : `${label}: —`;
-    d.append(el("div", "small muted", fmtDev(c.capture, "Entrada")), el("div", "small muted", fmtDev(c.playback, "Saída")));
+    d.append(el("div", "small muted", fmtDev(c.capture, "Input")), el("div", "small muted", fmtDev(c.playback, "Output")));
     list.append(d);
   }
 }
@@ -45,13 +45,13 @@ async function loadMixer() {
   if (!gains.length) {
     note.hidden = false;
     note.textContent = r.controls.length
-      ? "Esta placa não tem ganhos controláveis por software: o ganho de entrada e o volume ajustam-se nos botões da própria placa. Os controlos abaixo são os únicos que o driver expõe."
-      : "Esta placa não expõe nenhum controlo de mixer ALSA (ganhos só nos botões da própria placa).";
+      ? "This card has no software-controllable gains: input gain and volume are set with the card's own knobs. The controls below are the only ones the driver exposes."
+      : "This card exposes no ALSA mixer controls (gains only on the card's own knobs).";
   }
   for (const c of r.controls) {
     const box = el("div", "ctl");
     const lab = el("label"); const v = el("span", "v");
-    lab.append(el("span", null, c.kind === "enum" ? c.name : `${c.name} · ${c.direction === "capture" ? "entrada" : "saída"}`), v);
+    lab.append(el("span", null, c.kind === "enum" ? c.name : `${c.name} · ${c.direction === "capture" ? "input" : "output"}`), v);
     box.append(lab);
     const post = body => api("POST", "/api/mixer", { card: CARD.current, id: c.id, kind: c.kind, direction: c.direction, ...body })
       .catch(e => toast(e.message));
@@ -70,7 +70,7 @@ async function loadMixer() {
       }
       if (c.has_switch) {
         const lbl = el("label", "sw-lbl"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!c.on;
-        cb.onchange = () => post({ on: cb.checked }); lbl.append(cb, document.createTextNode(" ligado"));
+        cb.onchange = () => post({ on: cb.checked }); lbl.append(cb, document.createTextNode(" on"));
         row.append(lbl);
       }
       box.append(row);
@@ -85,7 +85,7 @@ async function showCardTab() {
 }
 $("#cardSel").onchange = () => {
   CARD.current = $("#cardSel").value;
-  try { localStorage.setItem("ct2iep.card", CARD.current); } catch (_) { /* sem storage */ }
+  try { localStorage.setItem("ct2iep.card", CARD.current); } catch (_) { /* no storage */ }
   loadMixer().catch(e => toast(e.message));
 };
 $("#mixerRefresh").onclick = showCardTab;

@@ -1,29 +1,29 @@
 "use strict";
-// Plugins a pedido: biblioteca para adicionar blocos à cadeia (botão + na
-// faixa) e separador "Plugins" para instalar/remover pacotes de plugins.
+// Plugins on demand: library to add blocks to the chain (+ button in the
+// strip) and the "Plugins" tab to install/remove plugin packages.
 
 const LIB = { list: null, at: null };
 
 async function loadLibrary(force) {
   if (!LIB.list || force) LIB.list = (await api("GET", "/api/library")).plugins;
-  const n = $("#libCount"); if (n) n.textContent = `· ${LIB.list.length} plugins disponíveis`;
+  const n = $("#libCount"); if (n) n.textContent = `· ${LIB.list.length} plugins available`;
   return LIB.list;
 }
 
-// ---------- adicionar bloco ----------
+// ---------- add a block ----------
 function openLibrary() {
   const ids = UI.chain.blocks.map(b => b.id);
   const i = ids.indexOf(UI.selected);
   LIB.at = i < 0 ? ids.length : i + 1;
   const after = UI.chain.blocks[LIB.at - 1];
-  $("#libWhere").textContent = after ? `Será inserido depois de “${after.name}”. Depois podes arrastá-lo para outra posição.` : "Será inserido no início da cadeia.";
+  $("#libWhere").textContent = after ? `It will be inserted after “${after.name}”. You can drag it elsewhere afterwards.` : "It will be inserted at the start of the chain.";
   $("#libModal").hidden = false;
   $("#libSearch").value = "";
-  $("#libList").innerHTML = '<p class="muted">A carregar a biblioteca…</p>';
+  $("#libList").innerHTML = '<p class="muted">Loading the library…</p>';
   loadLibrary().then(list => {
     const sel = $("#libClass"), cur = sel.value;
     const classes = [...new Set(list.map(p => p.class))].sort();
-    sel.innerHTML = '<option value="">Todos os tipos</option>' + classes.map(c => `<option>${c}</option>`).join("");
+    sel.innerHTML = '<option value="">All types</option>' + classes.map(c => `<option>${c}</option>`).join("");
     sel.value = classes.includes(cur) ? cur : "";
     renderLibrary();
   }).catch(e => { $("#libList").innerHTML = ""; $("#libList").append(el("p", "muted", e.message)); });
@@ -37,30 +37,30 @@ function renderLibrary() {
   const list = (LIB.list || []).filter(p => (!cls || p.class === cls) &&
     (!q || `${p.name} ${p.author} ${p.class} ${p.bundle}`.toLowerCase().includes(q)));
   const box = $("#libList"); box.innerHTML = "";
-  if (!list.length) { box.append(el("p", "muted", "Nenhum plugin encontrado.")); return; }
+  if (!list.length) { box.append(el("p", "muted", "No plugins found.")); return; }
   for (const p of list.slice(0, 300)) {
     const row = el("div", "lib-row");
     const info = el("div", "lib-info");
     const title = el("div", "lib-name", p.name);
     const badges = el("span", "badges");
-    badges.append(el("span", "badge", p.ins > 1 ? "estéreo" : "mono"));
+    badges.append(el("span", "badge", p.ins > 1 ? "stereo" : "mono"));
     if (p.sidechain) badges.append(el("span", "badge", "sidechain"));
-    if (p.extra) badges.append(el("span", "badge extra", "pacote extra"));
+    if (p.extra) badges.append(el("span", "badge extra", "extra package"));
     title.append(badges);
     info.append(title, el("div", "muted small", [p.class, p.author, p.bundle].filter(Boolean).join(" · ")));
-    const add = el("button", null, "Adicionar");
+    const add = el("button", null, "Add");
     add.onclick = async () => {
       add.disabled = true;
       try {
         const r = await api("POST", "/api/chain/blocks", { uri: p.uri, at: LIB.at });
         UI.selected = r.id; closeLibrary();
-        toast(r.error ? `“${r.name}” adicionado, mas não carregou: ${r.error}` : `“${r.name}” adicionado à cadeia`, r.error ? 5000 : 2500);
+        toast(r.error ? `“${r.name}” added, but it did not load: ${r.error}` : `“${r.name}” added to the chain`, r.error ? 5000 : 2500);
         renderStrip(); renderPanel();
       } catch (e) { toast(e.message); add.disabled = false; }
     };
     row.append(info, add); box.append(row);
   }
-  if (list.length > 300) box.append(el("p", "muted small", `… e mais ${list.length - 300}: refina a pesquisa.`));
+  if (list.length > 300) box.append(el("p", "muted small", `… and ${list.length - 300} more: refine the search.`));
 }
 
 $("#libClose").onclick = closeLibrary;
@@ -71,13 +71,13 @@ $("#libClass").addEventListener("change", renderLibrary);
 
 UI.hooks.stripTail.push(strip => {
   const add = el("button", "blk-add", "+");
-  add.title = "Adicionar um plugin à cadeia (depois do bloco selecionado)";
+  add.title = "Add a plugin to the chain (after the selected block)";
   add.setAttribute("aria-label", add.title);
   add.onclick = openLibrary;
   strip.append(add);
 });
 
-// ---------- separador Plugins (pacotes) ----------
+// ---------- Plugins tab (packages) ----------
 let pkgBusy = false;
 function showPkgLog(lines, open) {
   const box = $("#pkgLogBox"); box.hidden = false; box.open = !!open;
@@ -85,16 +85,16 @@ function showPkgLog(lines, open) {
 }
 async function pkgAction(action, pkg) {
   if (pkgBusy) return;
-  const verb = action === "install" ? "Instalar" : "Remover";
-  if (!confirm(`${verb} o pacote ${pkg}?\n\nO motor de áudio reinicia (cerca de 2 s sem áudio). Não o faças durante uma emissão.`)) return;
+  const verb = action === "install" ? "Install" : "Remove";
+  if (!confirm(`${verb} package ${pkg}?\n\nThe audio engine restarts (about 2 s without audio). Do not do it while transmitting.`)) return;
   pkgBusy = true; renderPackages(LIB.pkgs, action === "install" ? pkg : null, action === "remove" ? pkg : null);
   try {
     const r = await api("POST", `/api/packages/${action}`, { pkg });
     showPkgLog(r.log, false);
     const m = r.manifest;
     if (action === "install") {
-      toast(m.missing_libs.length ? `${pkg} instalado, mas faltam bibliotecas: ${m.missing_libs.join(", ")}` : `${pkg} instalado (${m.bundles.length} plugins). Usa o + na Cadeia para os adicionar.`, 6000);
-    } else toast(`${pkg} removido`);
+      toast(m.missing_libs.length ? `${pkg} installed, but libraries are missing: ${m.missing_libs.join(", ")}` : `${pkg} installed (${m.bundles.length} plugins). Use + in the Chain tab to add them.`, 6000);
+    } else toast(`${pkg} removed`);
   } catch (e) {
     toast(e.message, 6000);
     if (e.data?.log?.length) showPkgLog(e.data.log, true);
@@ -115,21 +115,21 @@ function renderPackages(pkgs, installing, removing) {
     const card = el("div", "pkg");
     const head = el("div", "pkg-head");
     const t = el("div"); t.append(el("strong", null, p.title), el("code", "pkg-name", p.pkg));
-    const state = { base: "na imagem", installed: `instalado${p.version ? " · " + p.version : ""}`, available: "por instalar" }[p.state];
+    const state = { base: "in the image", installed: `installed${p.version ? " · " + p.version : ""}`, available: "not installed" }[p.state];
     head.append(t, el("span", "badge " + p.state, state));
     card.append(head, el("div", "muted small", p.desc));
-    if (p.missing_libs?.length) card.append(el("div", "small warn-text", `Bibliotecas em falta: ${p.missing_libs.join(", ")}`));
-    if (p.in_use) card.append(el("div", "small muted", "Em uso na cadeia."));
+    if (p.missing_libs?.length) card.append(el("div", "small warn-text", `Missing libraries: ${p.missing_libs.join(", ")}`));
+    if (p.in_use) card.append(el("div", "small muted", "In use in the chain."));
     const btnRow = el("div", "pkg-actions");
     if (p.state === "available") {
-      const b = el("button", null, installing === p.pkg ? "A instalar…" : "Instalar");
+      const b = el("button", null, installing === p.pkg ? "Installing…" : "Install");
       b.disabled = pkgBusy; b.onclick = () => pkgAction("install", p.pkg); btnRow.append(b);
     } else if (p.state === "installed") {
-      const b = el("button", "ghost danger", removing === p.pkg ? "A remover…" : "Remover");
-      b.disabled = pkgBusy || p.in_use; if (p.in_use) b.title = "Remove primeiro da cadeia os blocos que usam este pacote";
+      const b = el("button", "ghost danger", removing === p.pkg ? "Removing…" : "Remove");
+      b.disabled = pkgBusy || p.in_use; if (p.in_use) b.title = "First remove the blocks that use this package from the chain";
       b.onclick = () => pkgAction("remove", p.pkg); btnRow.append(b);
     }
-    if (installing === p.pkg) btnRow.append(el("span", "muted small", "a descarregar do repositório Debian; pode demorar um minuto"));
+    if (installing === p.pkg) btnRow.append(el("span", "muted small", "downloading from the Debian repository; this can take a minute"));
     card.append(btnRow); box.append(card);
   }
   $("#customInstall").disabled = pkgBusy;
