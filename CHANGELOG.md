@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Input trim and Output trim**: fixed gain stages before and after the chain
+  (−36 to +12 dB, Calf Mono Input), always active, also with A/B, and not part
+  of presets (stored in `data/levels.json`). Each shows peak meters before and
+  after the trim with a CLIP light, so card clipping and the level sent to the
+  radio are visible. *Left channel only* sends the (mono) chain only to the
+  left channel of the outputs.
 - **Output selector** (Card tab → *Output*): choose which playback devices
   receive the processed audio, detected automatically, several at once. The
   main card is JACK's own device; any other one (e.g. the FTDX-101D USB codec)

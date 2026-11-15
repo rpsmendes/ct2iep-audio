@@ -277,6 +277,8 @@ def chain_view(app):
     st = app["rt"]["state"]
     f: Factory = app["factory"]
     return {"chain_bypass": st["chain_bypass"], "online": app["engine"].online,
+            "levels": dict(app["rt"]["levels"], available=bool(app["engine"].trims) or not app["engine"].online,
+                           min_db=TRIM_MIN_DB, max_db=TRIM_MAX_DB),
             "io": {"inputs": f.inputs, "outputs": f.outputs},
             "blocks": [block_view(app, b) for b in st["blocks"]]}
 
@@ -344,6 +346,55 @@ def bridge_status():
 
 
 # ----------------------------------------------------------------------------
+# Input/output trims: fixed gain stages outside the chain
+# ----------------------------------------------------------------------------
+# Card input -> [input trim] -> chain -> [output trim] -> outputs. They are always
+# loaded (also with A/B: the trims set the levels, not the sound) and they are
+# not part of presets: they match the hardware (card, radio input) and are
+# stored in data/levels.json. Calf Mono Input: mono in, L/R out, gain +-36 dB,
+# peak meters and a mute per output channel ("left channel only").
+TRIM_URI = "http://calf.sourceforge.net/plugins/MonoInput"
+TRIM_MIN_DB, TRIM_MAX_DB = -36.0, 12.0
+LEVELS_DEFAULT = {"in_db": 0.0, "out_db": 0.0, "left_only": False}
+
+
+def load_levels():
+    lv = dict(LEVELS_DEFAULT)
+    try:
+        lv.update(json.loads((DATA_DIR / "levels.json").read_text()))
+    except (OSError, ValueError):
+        pass
+    return clean_levels(lv)
+
+
+def clean_levels(lv):
+    out = {}
+    for k in ("in_db", "out_db"):
+        try:
+            out[k] = round(min(TRIM_MAX_DB, max(TRIM_MIN_DB, float(lv.get(k, 0.0)))), 1)
+        except (TypeError, ValueError):
+            out[k] = 0.0
+    out["left_only"] = bool(lv.get("left_only", False))
+    return out
+
+
+def save_levels(lv):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    f = DATA_DIR / "levels.json"
+    tmp = f.with_suffix(".tmp")
+    tmp.write_text(json.dumps(lv))
+    tmp.replace(f)
+
+
+def trim_params(stage, lv):
+    """Gain on level_out: the plugin's input meter then shows the level before
+    the trim (for the input stage: the card's own level, to spot clipping)."""
+    g = 10 ** (lv["in_db" if stage == "in" else "out_db"] / 20)
+    return {"level_in": 1.0, "level_out": g, "softclip": 0.0, "mutel": 0.0,
+            "muter": 1.0 if (stage == "out" and lv["left_only"]) else 0.0}
+
+
+# ----------------------------------------------------------------------------
 # Engine (mod-host)
 # ----------------------------------------------------------------------------
 class Engine:
@@ -358,6 +409,7 @@ class Engine:
         self.errors = {}          # block id -> load error
         self.failed = {}          # block id -> uri that failed to load (not retried)
         self.meter_values = {}
+        self.trims = {}           # "in"/"out" -> mod-host instance (always loaded)
 
     async def cmd(self, line: str, quiet=False) -> str:
         async with self.lock:
@@ -411,10 +463,40 @@ class Engine:
             del self.meter_values[k]
         await self.cmd(f"remove {i}")
 
+    async def load_trims(self):
+        self.trims = {}
+        if not plugin_available(TRIM_URI):
+            log.warning("input/output trims unavailable: %s not installed", TRIM_URI)
+            return
+        lv = self.app["rt"]["levels"]
+        for stage in ("in", "out"):
+            i = self.next_inst
+            self.next_inst += 1
+            r = await self.cmd(f'add "{TRIM_URI}" {i}')
+            if r.startswith("resp -"):
+                log.warning("input/output trims unavailable: mod-host refused the plugin (%s)", r[5:])
+                return
+            self.trims[stage] = i
+            for sym, v in trim_params(stage, lv).items():
+                await self.cmd(f"param_set {i} {sym} {v:.6g}", quiet=True)
+            for sym in ("meter_in", "meter_outL", "clip_in", "clip_outL"):
+                await self.cmd(f"monitor_output {i} {sym}", quiet=True)
+
+    async def apply_levels(self):
+        lv = self.app["rt"]["levels"]
+        for stage, i in self.trims.items():
+            for sym, v in trim_params(stage, lv).items():
+                await self.cmd(f"param_set {i} {sym} {v:.6g}", quiet=True)
+
     def desired_links(self):
         f: Factory = self.app["factory"]
         src = f.inputs[:1]
         links = set()
+        if "in" in self.trims:
+            i = self.trims["in"]
+            for s in src:
+                links.add((s, f"effect_{i}:in_l"))
+            src = [f"effect_{i}:out_l"]
         for b in self.app["rt"]["state"]["blocks"]:
             i = self.inst.get(b["id"])
             if i is None or not self.wanted(b):
@@ -424,6 +506,15 @@ class Engine:
                 for a in meta["audio_in"]:
                     links.add((s, f"effect_{i}:{a}"))
             src = [f"effect_{i}:{meta['audio_out'][0]}"]
+        if "out" in self.trims:
+            i = self.trims["out"]
+            for s in src:
+                links.add((s, f"effect_{i}:in_l"))
+            # L -> first port, R -> second (R muted with "left channel only")
+            for card, dev in self.app["rt"]["outputs"]:
+                for n, o in enumerate(output_ports(self.app, card, dev)):
+                    links.add((f"effect_{i}:{'out_l' if n % 2 == 0 else 'out_r'}", o))
+            return links
         for card, dev in self.app["rt"]["outputs"]:
             for s in src:
                 for o in output_ports(self.app, card, dev):
@@ -463,6 +554,7 @@ class Engine:
     async def build(self):
         await self.cmd("remove -1")
         self.inst, self.links, self.errors, self.failed, self.next_inst = {}, set(), {}, {}, 0
+        await self.load_trims()
         await self.sync()
         await self.cmd("output_data_ready")
         log.info("chain loaded (%d blocks)", len(self.inst))
@@ -555,6 +647,17 @@ async def op_param(app, bid, sym, value, origin=None):
         await eng.cmd(f"param_set {i} {sym} {v:.6g}")
     schedule_save(app)
     await broadcast(app, {"type": "param", "block": bid, "symbol": sym, "value": v}, exclude=origin)
+
+
+async def op_levels(app, m):
+    """Input/output trims and "left channel only" (live, saved right away)."""
+    lv = clean_levels({**app["rt"]["levels"], **{k: m[k] for k in ("in_db", "out_db", "left_only") if k in m}})
+    app["rt"]["levels"] = lv
+    eng: Engine = app["engine"]
+    if eng.online:
+        async with app["rt"]["oplock"]:
+            await eng.apply_levels()
+    save_levels(lv)
 
 
 async def op_bypass(app, bid, value):
@@ -664,6 +767,15 @@ async def meter_ticker(app):
                 if m["lin"]:
                     v = 20 * math.log10(v) if v > 1e-6 else -120.0
                 out[f"{b['id']}.{m['symbol']}"] = round(v, 1)
+        for stage, i in eng.trims.items():
+            for sym, key in (("meter_in", "pre"), ("meter_outL", "post")):
+                v = eng.meter_values.get((i, sym))
+                if v is not None:
+                    out[f"_{stage}.{key}"] = round(20 * math.log10(v), 1) if v > 1e-6 else -120.0
+            for sym, key in (("clip_in", "clip_pre"), ("clip_outL", "clip_post")):
+                v = eng.meter_values.get((i, sym))
+                if v is not None:
+                    out[f"_{stage}.{key}"] = 1 if v > 0.5 else 0
         if out:
             await broadcast(app, {"type": "meters", "values": out})
 
@@ -1043,6 +1155,9 @@ async def h_ws(request):
                     await op_bypass(app, m["block"], m["value"])
                     await broadcast(app, m, exclude=ws)
                     await broadcast(app, {"type": "chain", "chain": chain_view(app)})
+                elif t == "levels":
+                    await op_levels(app, m)
+                    await broadcast(app, {"type": "levels", "levels": app["rt"]["levels"]}, exclude=ws)
                 elif t == "chain_bypass":
                     await op_bypass(app, None, m["value"])
                     await broadcast(app, m, exclude=ws)
@@ -1090,6 +1205,7 @@ def make_app():
     app["rt"]["state"] = normalize_state(app, saved)
     app["sockets"] = set()
     app["rt"]["outputs"] = load_outputs()
+    app["rt"]["levels"] = load_levels()
     app["engine"] = Engine(app)
     r = app.router
     r.add_get("/", h_index)

@@ -234,3 +234,21 @@ code { font-family: var(--mono); font-size: 12px; }
 .modal-box .lib-list { flex: 1; min-height: 120px; }
 .preset-info { font-size: 13px; line-height: 1.45; }
 .preset-info .small { margin-top: 4px; color: var(--muted); }
+
+/* input / output trims */
+.levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.lvl { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 10px; }
+.lvl-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.lvl-head .lvl-val { margin-left: auto; font-family: var(--mono); font-size: 15px; }
+.lvl-meters { display: grid; gap: 4px; margin-top: 8px; }
+.lvl-m { display: grid; grid-template-columns: 62px 1fr 44px 34px; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.lvl-m .bar { height: 8px; background: #0e1013; border-radius: 3px; overflow: hidden; position: relative; }
+.lvl-m .fill { position: absolute; top: 0; bottom: 0; left: 0; width: 0;
+  background: linear-gradient(90deg, #3aa86d 0%, #3aa86d 70%, var(--accent) 85%, var(--bad) 100%);
+  background-size: var(--w, 100%) 100%; transition: width 60ms linear; }
+.lvl-m .val { font-family: var(--mono); color: var(--text); text-align: right; }
+.lvl-m .clip { font-size: 10px; font-weight: 700; text-align: center; border-radius: 3px; padding: 1px 0;
+  color: var(--muted); border: 1px solid var(--line); opacity: .5; }
+.lvl-m .clip.on { background: var(--bad); color: #fff; border-color: var(--bad); opacity: 1; }
+.lvl-opt { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; cursor: pointer; }
+.lvl-opt input { accent-color: var(--accent); }

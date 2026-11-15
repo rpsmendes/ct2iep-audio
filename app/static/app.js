@@ -6,7 +6,7 @@ const UI = {
   chain: null,            // view returned by /api/chain
   selected: null,         // id of the selected block
   fine: false,            // fine adjustment on (useful on touch screens)
-  hooks: { panel: [], param: [], chain: [], stripTail: [], panelActions: [] },
+  hooks: { panel: [], param: [], chain: [], stripTail: [], panelActions: [], meters: [], levels: [] },
   tabs: {},               // name -> { onShow }
 };
 let ws = null;
@@ -179,7 +179,8 @@ function handle(m) {
     }
     case "bypass": { const b = blockById(m.block); if (b) b.bypass = m.value; renderStrip(); if (UI.selected === m.block) renderPanel(); UI.hooks.param.forEach(f => f(b)); break; }
     case "chain_bypass": UI.chain.chain_bypass = m.value; renderStrip(); UI.hooks.param.forEach(f => f(null)); break;
-    case "meters": updateMeters(m.values); break;
+    case "meters": updateMeters(m.values); UI.hooks.meters.forEach(f => f(m.values)); break;
+    case "levels": UI.hooks.levels.forEach(f => f(m.levels)); break;
     case "error": toast("Error: " + m.message); break;
   }
 }

@@ -137,6 +137,18 @@ the radio. Use a foot switch on the rear PTT socket, VOX, or PTT over CAT/USB
 ## 4. Using the UI
 
 ### Chain
+- **Input trim / Output trim** (top of the tab): fixed gain stages before and
+  after the chain (−36 to +12 dB), with peak meters before and after each trim
+  and a CLIP light. They stay active with **A/B** and are not part of presets
+  (they match the hardware; stored in `data/levels.json`). How to set them:
+  1. card input gain knob so the *Card* meter peaks around −12…−6 dB and never
+     shows CLIP (a digital trim cannot undo clipping in the card);
+  2. *Output trim* down until the radio's ALC barely moves on voice peaks. A
+     radio's USB input usually needs far less than digital full scale: −15 dB
+     or more is normal.
+  The chain is mono and goes to both channels of each output. If the radio adds
+  both channels of its USB input, **Left channel only** lowers the level by
+  about 6 dB.
 - **Block strip** (like in Waveform): click a block to see its parameters; the
   ⏻ button switches that block on/off. A switched-off block is unloaded from
   the engine and the signal goes around it, so it uses no CPU.
@@ -234,6 +246,7 @@ folder. Then everything is managed from `/home/opt` with `docker compose ...`.
 | I want to… | Where |
 |---|---|
 | Change the order / add / remove blocks | in the UI (Chain tab) |
+| Too much level into the radio (distortion, ALC) | *Output trim* in the Chain tab (also works with A/B) |
 | Change the factory chain | `config/chain.yaml` → `docker compose restart audio-web` → *Factory chain* in the UI |
 | Change / add built-in presets | `config/presets.yaml` → `docker compose restart audio-web` |
 | Get more plugins | Plugins tab (or `docker compose exec audio-web ls /data/lv2/bundles`) |
