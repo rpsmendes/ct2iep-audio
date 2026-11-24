@@ -133,6 +133,8 @@ receive the processed audio is chosen in the UI** (Card tab → *Output*).
   the audio whenever it is in TX, and ignores the browser mic meanwhile. Needs the
   `ZEUS_TCI_TX_AUDIO` patch and TCI enabled in Zeus (bind 0.0.0.0, port 40001):
   see ct2iep-hl2remote, `docs/hl2remote.md`, *TCI TX audio from ct2iep-audio*.
+  At key-down it sends `ZEUS_TCI_PREFILL_MS` (default 100 ms) of silence so Zeus
+  keeps a lead of audio (without it: micro-cuts on the air).
   Untick it when operating Zeus away from the station mic.
 
 **On the radio:** the SSB modulation source must be the rear input (REAR) and,

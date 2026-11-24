@@ -35,6 +35,15 @@ BLOCK = 960                       # 20 ms, Zeus' own TX block size
 HEADER = struct.Struct("<8I32x")  # receiver, rate, sample type, codec, crc, length, stream type, reserved
 FLOAT32, TX_AUDIO = 3, 2
 RETRY_S = 3
+# Silence sent at key-down so Zeus has a lead of audio: its TX IQ ring has no
+# prefill and with a frame arriving "just in time" every 20 ms it ran empty
+# between blocks (micro-cuts). Needs the MOX broadcast of the Zeus patch
+# (trx:0,true;); without it nothing is sent and nothing changes.
+try:
+    PREFILL_MS = max(0, min(300, int(os.environ.get("ZEUS_TCI_PREFILL_MS", "100"))))
+except ValueError:
+    PREFILL_MS = 100
+PREFILL_FRAMES = -(-PREFILL_MS * RATE // 1000 // BLOCK)   # round up to whole 20 ms frames
 
 
 def frame(samples):
@@ -85,9 +94,15 @@ async def pump(rb):
                     if not connected_once:
                         print(f"[zeus-tci] connected to {URL}", flush=True)
                     connected_once = True
-                    reader = asyncio.create_task(drain(ws))
+                    keyed = asyncio.Event()
+                    reader = asyncio.create_task(drain(ws, keyed))
                     try:
                         while not reader.done():
+                            if keyed.is_set():
+                                keyed.clear()
+                                silence = np.zeros(BLOCK, dtype="<f4")
+                                for _ in range(PREFILL_FRAMES):
+                                    await asyncio.wait_for(ws.send_bytes(frame(silence)), 2)
                             while rb.read_space >= need:
                                 buf = np.frombuffer(rb.read(need), dtype="<f4")
                                 await asyncio.wait_for(ws.send_bytes(frame(buf)), 2)
@@ -105,11 +120,15 @@ async def pump(rb):
             await asyncio.sleep(0.1)
 
 
-async def drain(ws):
-    """Read and ignore what Zeus sends (state, chrono frames) until it closes."""
+async def drain(ws, keyed):
+    """Read what Zeus sends until it closes; only MOX on (trx:0,true;) matters."""
     async for msg in ws:
         if msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
             break
+        if msg.type == aiohttp.WSMsgType.TEXT:
+            for cmd in msg.data.split(";"):
+                if cmd.strip().lower().replace(" ", "") == "trx:0,true":
+                    keyed.set()
 
 
 if __name__ == "__main__":

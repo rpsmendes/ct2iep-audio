@@ -12,6 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   from any browser. Never keys the radio; reconnects by itself, state shown in
   the UI. `ZEUS_TCI_URL` (default `ws://zeus:40001`, empty hides it). Needs
   `python3-jack-client` (image rebuild) and the Zeus patch from ct2iep-hl2remote.
+- Zeus output: sends `ZEUS_TCI_PREFILL_MS` (default 100 ms) of silence when Zeus
+  reports MOX on (`trx:0,true;`, needs the updated Zeus patch), so Zeus keeps a lead
+  of audio; without it the air audio had micro-cuts.
 - **Input trim and Output trim**: fixed gain stages before and after the chain
   (−36 to +12 dB, Calf Mono Input), always active, also with A/B, and not part
   of presets (stored in `data/levels.json`). Each shows peak meters before and
