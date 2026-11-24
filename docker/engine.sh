@@ -61,6 +61,8 @@ mtime() { stat -c %Y "$1" 2>/dev/null || echo 0; }
 
 # Output bridges: one zita-j2a per "CARD DEVICE" line of outputs.txt that is
 # not JACK's own device (AUDIO_CARD, 0). JACK client name: out_CARD_DEVICE.
+# "ZEUS 0" is virtual: app/zeus_tci.py (JACK client out_ZEUS_0) sends the audio
+# to Zeus (Square SDR) as TCI TX audio instead of a sound card.
 running() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 sync_bridges() {
     wanted=""
@@ -77,9 +79,17 @@ sync_bridges() {
             now=$(date +%s); last=$(cat "$BRIDGE_DIR/$name.try" 2>/dev/null || echo 0)
             [ $((now - last)) -lt 10 ] && continue
             echo "$now" > "$BRIDGE_DIR/$name.try"
-            echo "[engine] output bridge $name -> hw:$card,$dev"
-            zita-j2a -j "$name" -d "hw:$card,$dev" -r "$RATE" -p 256 -n 3 -c 2 \
-                > "$BRIDGE_DIR/$name.log" 2>&1 &
+            rm -f "$BRIDGE_DIR/$name.state"
+            if [ "$card" = ZEUS ]; then
+                # virtual output: TX audio to Zeus (Square SDR) over TCI, see app/zeus_tci.py
+                echo "[engine] output bridge $name -> Zeus TCI ${ZEUS_TCI_URL:-ws://zeus:40001}"
+                python3 -u /app/zeus_tci.py "$name" "$BRIDGE_DIR/$name.state" \
+                    > "$BRIDGE_DIR/$name.log" 2>&1 &
+            else
+                echo "[engine] output bridge $name -> hw:$card,$dev"
+                zita-j2a -j "$name" -d "hw:$card,$dev" -r "$RATE" -p 256 -n 3 -c 2 \
+                    > "$BRIDGE_DIR/$name.log" 2>&1 &
+            fi
             echo $! > "$BRIDGE_DIR/$name.pid"
         done < "$OUT_FILE"
     fi
@@ -95,7 +105,9 @@ sync_bridges() {
     done
     # status for the web UI
     for name in $wanted; do
-        if running "$BRIDGE_DIR/$name.pid"; then echo "$name running"
+        if running "$BRIDGE_DIR/$name.pid"; then
+            # the Zeus TCI client reports its own state (connected or not)
+            echo "$name $(head -n 1 "$BRIDGE_DIR/$name.state" 2>/dev/null || echo running)"
         else echo "$name failed $(grep -v '^$' "$BRIDGE_DIR/$name.log" 2>/dev/null | tail -n 1)"; fi
     done > "$ENGINE_DIR/bridges.status.tmp" && mv "$ENGINE_DIR/bridges.status.tmp" "$ENGINE_DIR/bridges.status"
 }

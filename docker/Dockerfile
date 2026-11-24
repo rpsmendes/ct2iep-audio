@@ -20,7 +20,7 @@ RUN echo "jackd2 jackd/tweak_rt_limits boolean false" | debconf-set-selections \
         jackd2 jack-example-tools zita-ajbridge alsa-utils \
         liblilv-0-0 liblilv-dev libreadline8t64 libfftw3-single3 libfftw3-double3 \
         lsp-plugins-lv2 calf-plugins x42-plugins dragonfly-reverb-lv2 \
-        python3 python3-lilv python3-aiohttp python3-yaml python3-numpy \
+        python3 python3-lilv python3-aiohttp python3-yaml python3-numpy python3-jack-client \
         procps tini \
     && rm -rf /var/lib/apt/lists/*
 
@@ -36,6 +36,7 @@ COPY app /app
 RUN chmod +x /usr/local/bin/engine.sh \
     && command -v jack_lsp \
     && ! ldd /usr/local/bin/mod-host | grep "not found" \
+    && python3 -c "import jack" \
     && python3 -c "import numpy, lilv; w = lilv.World(); w.load_all(); print(len(w.get_all_plugins()), 'plugins LV2')"
 
 # Self-test of the EQ graph measurement host (informative, never fails the

@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Zeus · Square SDR (TCI)** output (Card tab → *Output*): sends the chain's
+  audio to Zeus as TCI TX audio (`app/zeus_tci.py`, JACK client `out_ZEUS_0`,
+  48 kHz mono float32), to transmit with the UA22 mic while Zeus is operated
+  from any browser. Never keys the radio; reconnects by itself, state shown in
+  the UI. `ZEUS_TCI_URL` (default `ws://zeus:40001`, empty hides it). Needs
+  `python3-jack-client` (image rebuild) and the Zeus patch from ct2iep-hl2remote.
 - **Input trim and Output trim**: fixed gain stages before and after the chain
   (−36 to +12 dB, Calf Mono Input), always active, also with A/B, and not part
   of presets (stored in `data/levels.json`). Each shows peak meters before and

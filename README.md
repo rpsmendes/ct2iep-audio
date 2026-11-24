@@ -124,6 +124,17 @@ receive the processed audio is chosen in the UI** (Card tab → *Output*).
   (`docker compose logs audio-engine | grep bridge`) and restarted if the radio is
   switched off and on again.
 
+- **Option C, Zeus (Square SDR) over TCI:** Card tab → *Output*, tick
+  *Zeus · Square SDR (TCI)*. The chain's (left channel) audio goes to Zeus as TCI
+  TX audio over the station's Docker network (`ZEUS_TCI_URL`, default
+  `ws://zeus:40001`; 48 kHz mono float32, 20 ms frames), so you can transmit with
+  the UA22 mic while operating Zeus from any browser. The bridge
+  (`app/zeus_tci.py`, JACK client `out_ZEUS_0`) never keys the radio: Zeus uses
+  the audio whenever it is in TX, and ignores the browser mic meanwhile. Needs the
+  `ZEUS_TCI_TX_AUDIO` patch and TCI enabled in Zeus (bind 0.0.0.0, port 40001):
+  see ct2iep-hl2remote, `docs/hl2remote.md`, *TCI TX audio from ct2iep-audio*.
+  Untick it when operating Zeus away from the station mic.
+
 **On the radio:** the SSB modulation source must be the rear input (REAR) and,
 for option B, the rear input must be set to USB. Check the exact menu names in
 the FTDX-101D manual.
@@ -218,7 +229,9 @@ installing, use **+** in the Chain tab to add the new plugins.
 (detected automatically; several at once is fine). The main card is JACK's own
 device; any other one goes through a resampling bridge, with its state shown
 next to it (running / failed with the reason, e.g. card unplugged; it is
-retried every 10 s). The choice is stored in `data/engine/outputs.txt` and is
+retried every 10 s). *Zeus · Square SDR (TCI)* is not a card but a virtual
+output (TX audio to Zeus over TCI, option C above): *connected* / *not
+connected* with the reason; hidden when `ZEUS_TCI_URL=` is empty in `.env`. The choice is stored in `data/engine/outputs.txt` and is
 not part of presets.
 
 The tab also lists the audio interfaces (via `aplay -l`/`arecord -l`) and shows the ALSA

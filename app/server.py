@@ -317,6 +317,16 @@ def save_outputs(outs):
     tmp.replace(f)
 
 
+# Virtual output "ZEUS 0": the chain's audio goes to Zeus (Square SDR) as TCI TX
+# audio (engine.sh starts app/zeus_tci.py, JACK client out_ZEUS_0, same ports as
+# a bridge). Shown in the UI unless ZEUS_TCI_URL is set empty in .env.
+ZEUS_TCI_URL = os.environ.get("ZEUS_TCI_URL", "ws://zeus:40001").strip()
+VIRTUAL_OUTPUTS = [
+    {"card": "ZEUS", "device": 0, "label": "Zeus · Square SDR (TCI)",
+     "sub": f"TX audio to Zeus over TCI ({ZEUS_TCI_URL}), used whenever Zeus is in TX"}
+] if ZEUS_TCI_URL else []
+
+
 def bridge_name(card, dev):
     return f"out_{card}_{dev}"
 
@@ -1049,7 +1059,7 @@ async def h_outputs(request):
             b = st.get(bridge_name(c, d), {"state": "starting", "detail": ""})
             item.update(b)
         out.append(item)
-    return web.json_response({"main": MAIN_CARD, "selected": out})
+    return web.json_response({"main": MAIN_CARD, "selected": out, "virtual": VIRTUAL_OUTPUTS})
 
 
 async def h_outputs_set(request):

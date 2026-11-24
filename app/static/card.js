@@ -87,6 +87,8 @@ async function loadOutputs(data) {
   const sel = new Map(r.selected.map(o => [keyOf(o.card, o.device), o]));
   const rows = [];
   for (const c of CARD.list) for (const d of c.playback) rows.push({ card: c.id, device: d.device, label: `${c.id} · ${d.name}`, sub: `${c.name} · hw:${c.id},${d.device}` });
+  // virtual outputs (Zeus over TCI): not sound cards, always listed
+  for (const v of r.virtual || []) rows.push({ ...v, virtual: true });
   // selected devices that are not connected right now
   for (const o of r.selected) if (!rows.some(x => keyOf(x.card, x.device) === keyOf(o.card, o.device)))
     rows.push({ card: o.card, device: o.device, label: `${o.card} · device ${o.device}`, sub: "not detected (unplugged?)", gone: true });
@@ -102,9 +104,11 @@ async function loadOutputs(data) {
     const badges = el("div", "badges");
     if (main) badges.append(el("span", "badge installed", "main card · direct"));
     else if (o) {
-      const st = { running: ["installed", "bridge running"], failed: ["available", "bridge failed"], starting: ["base", "bridge starting…"] }[o.state] || ["base", o.state];
+      const st = (x.virtual
+        ? { running: ["installed", "connected"], failed: ["available", "not connected"], starting: ["base", "connecting…"] }
+        : { running: ["installed", "bridge running"], failed: ["available", "bridge failed"], starting: ["base", "bridge starting…"] })[o.state] || ["base", o.state];
       const b = el("span", "badge " + st[0], st[1]); if (o.detail) b.title = o.detail; badges.append(b);
-    } else badges.append(el("span", "badge base", "via bridge"));
+    } else badges.append(el("span", "badge base", x.virtual ? "via TCI" : "via bridge"));
     row.append(cb, info, badges);
     if (o && o.state === "failed" && o.detail) info.append(el("div", "small warn-text", o.detail));
     box.append(row);
