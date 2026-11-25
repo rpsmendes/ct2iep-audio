@@ -263,7 +263,22 @@ ct2iep-station, port 7080).
   6 dB above that reading; speak normally and check that word starts and ends
   are not cut. *Reduction* is how far the noise goes down in the pauses. The
   gate cannot remove the noise *under* the voice: for that, keep the mic close
-  (3–5 cm) and the fans behind its dead side (the back of a cardioid).
+  (3–5 cm) and the fans behind its dead side (the back of a cardioid), or
+  switch on the noise suppression below.
+
+  **Noise suppression** (block 2 of the Broadcast presets, **off** by
+  default: switch it on with its ⏻ button and compare): RNNoise, a small
+  neural network trained on speech ([werman/noise-suppression-for-voice](https://github.com/werman/noise-suppression-for-voice),
+  GPL-3.0), built into the image because Debian does not package it. On a test
+  with fan noise it silenced the pauses completely and lowered the noise under
+  the voice by about 4–5 dB, without changing the voice-dominated part of the
+  spectrum; it adds about 30 ms of latency and a few % of one CPU core. Its own
+  voice detection mutes the pauses, so with it on the gate has little left to
+  do. Listen for artefacts (a "watery" voice, cut word ends) on a second
+  receiver: if you hear them, leave it off and rely on the gate. The first
+  image build takes a few minutes longer (it compiles the plugin); if that
+  build fails the image is built without it and the block says "plugin not
+  installed".
   With a dynamic mic (e.g. FDUCE SL40X) the depth comes from the proximity
   effect: 3–5 cm, always at the same distance, slightly off-axis, with a
   pop filter.

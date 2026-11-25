@@ -59,9 +59,20 @@ _RX = {
     "generator": re.compile(r"noise generator|oscillator", re.I),
     "midi": re.compile(r"filterclavier|trigger", re.I),
     "routing": re.compile(r"haas|spread|stereo routing|balance|x-over|crossover|rotary|delay compensator|delay line|compensation delay", re.I),
-    "voice": re.compile(r"equali|\beq\b|filter|compress|limiter|gate|expander|dynamics|de-?esser|exciter|enhancer|saturat|clipper|autogain|loudness comp|phaserotate|surge|emphasis|tape|crusher|fil4|dpl|mono input", re.I),
+    "voice": re.compile(r"equali|\beq\b|filter|compress|limiter|gate|expander|dynamics|de-?esser|exciter|enhancer|saturat|clipper|autogain|loudness comp|phaserotate|surge|emphasis|tape|crusher|fil4|dpl|mono input|noise suppression|denois|rnnoise", re.I),
 }
 _STEREO_WORDS = re.compile(r"\s*\b(stereo|mono|x2|leftright|midside|left/right|mid/side|l/r|m/s)\b", re.I)
+
+
+def _file_param(plugin):
+    """True when a patch:writable property takes a file (atom:Path). Plain
+    numeric patch properties (e.g. JUCE-built plugins such as RNNoise) keep
+    their defaults in mod-host and do not make a plugin unusable."""
+    for prop in _world.find_nodes(plugin.get_uri(), _N["patch_writable"], None):
+        rng = _world.get(prop, _N["rdfs_range"], None)
+        if rng is None or str(rng) == "http://lv2plug.in/ns/ext/atom#Path":
+            return True
+    return False
 
 
 def _categorize(plugin, name, n_in, n_sc):
@@ -71,7 +82,7 @@ def _categorize(plugin, name, n_in, n_sc):
     if not re.search(r"loudness compensator", name, re.I) and (
             "http://lv2plug.in/ns/lv2core#AnalyserPlugin" in classes or _RX["visual"].search(name)):
         return "visual"
-    if _world.ask(plugin.get_uri(), _N["patch_writable"], None) or _RX["file"].search(name):
+    if _file_param(plugin) or _RX["file"].search(name):
         return "file"
     if n_sc or re.search(r"sidechain", name, re.I):
         return "sidechain"
@@ -125,6 +136,7 @@ def reload():
             "optional": w.new_uri("http://lv2plug.in/ns/lv2core#connectionOptional"),
             "notonui": w.new_uri("http://lv2plug.in/ns/ext/port-props#notOnGUI"),
             "patch_writable": w.new_uri("http://lv2plug.in/ns/ext/patch#writable"),
+            "rdfs_range": w.new_uri("http://www.w3.org/2000/01/rdf-schema#range"),
         }
         _world = w
         _desc_cache.clear()

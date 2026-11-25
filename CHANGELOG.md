@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Noise suppression (RNNoise)**: werman/noise-suppression-for-voice LV2
+  (mono) built in a separate Docker stage (pinned commit; the image is still
+  built if this step fails). Added to the Broadcast SSB presets after the
+  high-pass, **off** by default. JUCE plugins with numeric patch parameters are
+  no longer classified as "needs a file".
 - **Test tone** (Chain tab, under the Output trim): 1 kHz or two-tone
   700 + 1900 Hz at the limiter's −1 dBFS peak, instead of the chain and before
   the Output trim, to set the level into the radio by its power/ALC meters and

@@ -27,6 +27,10 @@
 # Signal path (each step has one job, so nothing is pushed into distortion):
 #   hpf     48 dB/oct high-pass at 45-70 Hz: removes rumble and the sub-bass
 #           part of plosives, which use power and ALC without being heard
+#   nr      RNNoise noise suppression (neural network trained on speech), OFF
+#           by default: switch it on to compare. Removes steady noise (fans,
+#           power supplies) in the pauses completely and partly under the voice;
+#           adds ~30 ms of latency. Needs the image built with it.
 #   gate    -40 dB in the pauses: the leveler and the compressor add ~30 dB of
 #           gain, so without it fans and power supplies come up between words.
 #           Opens at -45 dBFS, closes 6 dB lower, 5 ms look-ahead (onsets are
@@ -74,6 +78,9 @@
 x-broadcast:
   # building blocks of the "Broadcast SSB" presets below (YAML anchors)
   hpf: &bc_hpf { id: hpf, name: High-pass, uri: "http://lsp-plug.in/plugins/lv2/filter_mono", main: [f, s] }
+  # RNNoise noise suppression: off by default (switch it on with its power button to compare);
+  # needs the image built with it (docker/Dockerfile), otherwise it says "plugin not installed"
+  nr: &bc_nr { id: nr, name: Noise suppression, uri: "https://github.com/werman/noise-suppression-for-voice#mono", bypass: true }
   phase: &bc_phase { id: phase, name: Phase rotator, uri: "http://gareus.org/oss/lv2/phaserotate", main: [angle],
     params: { angle: 120 } }
   # gate: closes 6 dB below the open threshold (ht is relative), -40 dB when closed, 5 ms
@@ -331,6 +338,7 @@ presets:
       Deepest low end: a shelf at 80 Hz and low-frequency harmonics give a big, round voice, with the 300 Hz "mud" and 600 Hz "box" taken out and a subtle exciter so it stays clear. Medium multiband density. Audio 60 Hz - 3 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 60 } }
+      - *bc_nr
       - *bc_gate
       - *bc_phase
       - *bc_agc
@@ -362,6 +370,7 @@ presets:
       Deepest low end: a shelf at 80 Hz and low-frequency harmonics give a big, round voice, with the 300 Hz "mud" and 600 Hz "box" taken out and a subtle exciter so it stays clear. Medium multiband density. Audio 50 Hz - 4 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 50 } }
+      - *bc_nr
       - *bc_gate
       - *bc_phase
       - *bc_agc
@@ -394,6 +403,7 @@ presets:
       Deepest low end: a shelf at 80 Hz and low-frequency harmonics give a big, round voice, with the 300 Hz "mud" and 600 Hz "box" taken out and a subtle exciter so it stays clear. Medium multiband density. Audio 45 Hz - 5 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 45 } }
+      - *bc_nr
       - *bc_gate
       - *bc_phase
       - *bc_agc
@@ -426,6 +436,7 @@ presets:
       Tight, firm low end at 120 Hz (high-pass a little higher, no sub-bass), 350 Hz cut, forward presence with an exciter and the densest compression: full-bodied but cuts through noise and QRM. Audio 80 Hz - 3 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 80 } }
+      - *bc_nr
       - *bc_gate
       - *bc_phase
       - *bc_agc
@@ -455,6 +466,7 @@ presets:
       Tight, firm low end at 120 Hz (high-pass a little higher, no sub-bass), 350 Hz cut, forward presence with an exciter and the densest compression: full-bodied but cuts through noise and QRM. Audio 70 Hz - 4 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 70 } }
+      - *bc_nr
       - *bc_gate
       - *bc_phase
       - *bc_agc
@@ -485,6 +497,7 @@ presets:
       Tight, firm low end at 120 Hz (high-pass a little higher, no sub-bass), 350 Hz cut, forward presence with an exciter and the densest compression: full-bodied but cuts through noise and QRM. Audio 65 Hz - 5 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 65 } }
+      - *bc_nr
       - *bc_gate
       - *bc_phase
       - *bc_agc
@@ -515,6 +528,7 @@ presets:
       Smooth studio voice: warmth from a 130 Hz shelf, a light 330 Hz cut, gentle 2:1 compression in every band and only a touch of exciter. The most natural of the three. Audio 60 Hz - 3 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 60 } }
+      - *bc_nr
       - *bc_gate
       - *bc_phase
       - *bc_agc
@@ -546,6 +560,7 @@ presets:
       Smooth studio voice: warmth from a 130 Hz shelf, a light 330 Hz cut, gentle 2:1 compression in every band and only a touch of exciter. The most natural of the three. Audio 50 Hz - 4 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 50 } }
+      - *bc_nr
       - *bc_gate
       - *bc_phase
       - *bc_agc
@@ -578,6 +593,7 @@ presets:
       Smooth studio voice: warmth from a 130 Hz shelf, a light 330 Hz cut, gentle 2:1 compression in every band and only a touch of exciter. The most natural of the three. Audio 45 Hz - 5 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 45 } }
+      - *bc_nr
       - *bc_gate
       - *bc_phase
       - *bc_agc
