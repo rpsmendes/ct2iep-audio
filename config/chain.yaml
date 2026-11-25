@@ -22,7 +22,10 @@ blocks:
     replaces: Waves C1 gate
     uri: http://lsp-plug.in/plugins/lv2/gate_mono
     main: [gt, gr, at, rt, gh, ht]
-    params: { gt: "-50dB", gr: "-24dB", at: 2, rt: 250, gh: 1, ht: "-56dB" }
+    # ht (hysteresis) is relative to gt: the gate opens above gt and closes again
+    # 6 dB lower. (It used to be -56 dB, i.e. closing only below -106 dBFS: once
+    # open, the gate never closed again and let the room noise through.)
+    params: { gt: "-50dB", gr: "-24dB", at: 2, rt: 250, gh: 1, ht: "-6dB" }
     meters:
       - { symbol: ilm, label: "Input" }
       - { symbol: rlm, label: "Gate", kind: gr }

@@ -48,42 +48,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   filters (in the image / installed from the UI) and pages of 20/50/100.
 
 ### Changed
-- **Same look as the other ct2iep-* apps** (ct2iep-amp, ct2iep-station): same
-  header (brand, state chips, *Keep screen on* and *Full screen* buttons, tabs
-  after a divider; icons only on phones), same colour tokens, every area in a
-  card with a title line (dot, name, summary) and tiles inside, same toast
-  (green, red for errors) and a footer line. Header chips: **ENGINE ON / OFF /
-  NO LINK**, **BYPASS** while A/B is on, **CLIP** (blinking) while the card input
-  or the output to the radio clips.
-- **Plugin lists show only the plugins usable in the chain** by default
-  (~70 of ~300): meters/analysers, sidechain, file-based, multi-input, MIDI,
-  generator and stereo-only plugins, and stereo versions of plugins that exist
-  in mono, are hidden; *All plugins* shows them with the reason. Classified from
-  the LV2 metadata (`lv2meta._categorize`); checked on 2026-11-25 against every
-  plugin of the image (all load in mod-host; meters leave the signal unchanged).
-  Package cards show "N of M plugins usable in the chain".
-- **Blocks in a grid instead of a horizontal strip**: they wrap in rows (two
-  columns on a phone), numbered in signal order; each block shows its own
-  meters (GR, input/output level) instead of a separate row of meters; dragging
-  by ⋮⋮ works across rows; on a phone, choosing a block scrolls to its panel.
-- `/static/` files (CSS, JS) are sent with `Cache-Control: no-cache`: browsers
-  revalidate them on every load, so a new UI shows up after an update without a
-  forced reload.
-- **Compose services renamed** `engine` → `audio-engine` and `web` →
-  `audio-web` (same as the container names), so this file can be included in a
-  central compose file with other stacks. Commands such as
-  `docker compose logs web` become `docker compose logs audio-web`.
-- **A/B and block bypass now really switch plugins off.** mod-host's own
-  bypass keeps running the plugin every cycle, so CPU use did not drop. Now a
-  bypassed block is unloaded and the signal is wired around it; A/B unloads
-  every plugin and connects the input straight to the output. Switching a block
-  (or the whole chain) back on loads it again in a fraction of a second, while
-  the signal keeps flowing on the old path. Meters of switched-off blocks are
-  greyed out.
-- All repository content (code comments, UI text, configuration and
-  documentation) is now written in English.
-
-### Fixed
+- **Gate never closed again once open**: its hysteresis threshold (`ht`) is
+  relative to the open threshold, and the factory chain had −56 dB, so it only
+  closed below −106 dBFS and let fans and power supplies through in the pauses.
+  Now −6 dB (factory chain and Broadcast SSB presets).
 - **Empty EQ graph on Debian 13**: `lv2apply` crashed with the LSP plugins
   shipped by Debian 13 (1.2.21), which need their atom ports connected. The
   curve is now measured by a small built-in LV2 host (`app/measure_host.py`,
