@@ -45,6 +45,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (green, red for errors) and a footer line. Header chips: **ENGINE ON / OFF /
   NO LINK**, **BYPASS** while A/B is on, **CLIP** (blinking) while the card input
   or the output to the radio clips.
+- `/static/` files (CSS, JS) are sent with `Cache-Control: no-cache`: browsers
+  revalidate them on every load, so a new UI shows up after an update without a
+  forced reload.
 - **Compose services renamed** `engine` → `audio-engine` and `web` →
   `audio-web` (same as the container names), so this file can be included in a
   central compose file with other stacks. Commands such as

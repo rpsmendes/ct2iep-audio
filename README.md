@@ -275,7 +275,7 @@ folder. Then everything is managed from `/home/opt` with `docker compose ...`.
 | Lower the latency | `.env`: `PERIOD=128` (watch the log for XRuns; USB cards usually need `NPERIODS=3`) |
 | See errors | `docker compose logs -f audio-engine audio-web` |
 | Test Python/plugins in the image | `docker compose run --rm --no-deps audio-web python3 -c "import lilv; print('ok')"` |
-| Update | `git pull && docker compose build && docker compose up -d` |
+| Update (also for UI changes: `app/` is copied into the image, `restart` is not enough) | `git pull && docker compose build && docker compose up -d` |
 
 Expected latency: 3 periods × 256 samples at 48 kHz ≈ 16 ms of buffer + USB
 buffers and the limiter lookahead (2 ms) → about 20–25 ms round trip, which is

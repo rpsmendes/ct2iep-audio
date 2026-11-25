@@ -909,6 +909,16 @@ async def auth_mw(request, handler):
     return await handler(request)
 
 
+@web.middleware
+async def static_cache_mw(request, handler):
+    """CSS/JS are revalidated on every load (304 when unchanged), so a new
+    version of the UI shows up after an update without a forced reload."""
+    resp = await handler(request)
+    if request.path.startswith("/static/"):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 async def h_index(request):
     return web.FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
@@ -1201,7 +1211,7 @@ async def on_shutdown(app):
 def make_app():
     packages.migrate_layout()
     lv2meta.reload()
-    app = web.Application(middlewares=[auth_mw])
+    app = web.Application(middlewares=[auth_mw, static_cache_mw])
     app["factory"] = Factory(CHAIN_FILE)
     app["builtin"] = load_builtin(app["factory"], PRESETS_FILE)
     saved = {}
