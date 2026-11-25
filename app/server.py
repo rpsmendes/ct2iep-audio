@@ -114,7 +114,7 @@ def load_builtin(factory: Factory, path: Path):
                 params = dict(spec["params"]) if spec and spec["uri"] == uri else {}
                 params.update({k: parse_value(v) for k, v in (b.get("params") or {}).items()})
                 blk = {"id": b["id"], "uri": uri, "bypass": bool(b.get("bypass", False)), "params": params}
-                for k in ("name", "main", "meters", "labels"):
+                for k in ("name", "main", "meters", "labels", "help", "info"):
                     if b.get(k):
                         blk[k] = b[k]
                 blocks.append(blk)
@@ -164,8 +164,11 @@ def normalize_block(app, b):
     if isinstance(b.get("meters"), list):
         out["meters"] = [{k: m[k] for k in ("symbol", "label", "kind") if k in m}
                          for m in b["meters"] if isinstance(m, dict) and m.get("symbol")]
-    if isinstance(b.get("labels"), dict):
-        out["labels"] = {str(k): str(v) for k, v in b["labels"].items()}
+    for k in ("labels", "help"):
+        if isinstance(b.get(k), dict):
+            out[k] = {str(s): str(v) for s, v in b[k].items()}
+    if b.get("info"):
+        out["info"] = str(b["info"])
     if not plugin_available(out["uri"]):
         out["params"] = {k: float(v) for k, v in (b.get("params") or {}).items()}
         return out
@@ -277,16 +280,21 @@ def block_view(app, b):
     meters = resolve_meters(meta, spec["meters"] if spec and spec["meters"] is not None
                             else b.get("meters") if b.get("meters") is not None
                             else lv2meta.auto_meters(meta))
-    labels = b.get("labels") or {}
-    controls = [dict(c, name=labels[c["symbol"]]) if c["symbol"] in labels else c
-                for c in meta["controls"]]
+    labels, helps = b.get("labels") or {}, b.get("help") or {}
+    controls = []
+    for c in meta["controls"]:
+        if c["symbol"] in labels or c["symbol"] in helps:
+            c = dict(c, name=labels.get(c["symbol"], c["name"]))
+            if c["symbol"] in helps:
+                c["help"] = helps[c["symbol"]]
+        controls.append(c)
     graph = meta["graph"] and b["uri"] not in response.BROKEN and \
         (spec["graph"] if spec and spec["graph"] is not None else True)
     v.update({"name": (spec and spec["name"]) or b.get("name") or meta["name"],
               "replaces": spec["replaces"] if spec else "", "plugin": meta["name"],
               "class": meta["class"], "graph": bool(graph), "main": main,
               "graph_unsupported": bool(meta["eq_like"] and not graph),
-              "controls": controls, "defaults": defaults_for(app, b), "meters": meters,
+              "controls": controls, "info": b.get("info", ""), "defaults": defaults_for(app, b), "meters": meters,
               "stereo": len(meta["audio_in"]) > 1})
     return v
 

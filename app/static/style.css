@@ -161,6 +161,8 @@ button.danger:hover { border-color: var(--bad); color: var(--bad); }
 .sl:focus-visible .tr { box-shadow: 0 0 0 1px var(--accent-dim); }
 .ctl input[type=number] { width: 84px; padding: 3px 6px; font-family: var(--mono); font-size: 12px; }
 .ctl select { width: 100%; margin-top: 4px; }
+.ctl-help { margin: 6px 0 0; font-size: 12px; line-height: 1.35; color: var(--muted); }
+.block-info { font-size: 13px; line-height: 1.45; margin: 0 0 10px; }
 .ctl .sw { margin-top: 6px; }
 details.adv { margin-top: 14px; }
 details.adv summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }

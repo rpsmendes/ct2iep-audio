@@ -267,6 +267,7 @@ function renderPanel() {
     p.append(el("div", "note warn", b.missing ? "This block's plugin is not installed. Install its package in the Plugins tab or remove the block." : `This block was not loaded: ${b.error}.`));
     if (b.missing) return;
   }
+  if (b.info) p.append(el("p", "note block-info", b.info));
   UI.hooks.panel.forEach(f => f(b, p));
 
   const byS = Object.fromEntries(b.controls.map(c => [c.symbol, c]));
@@ -324,6 +325,7 @@ function makeControl(b, c) {
     row.append(sl.el, n); box.append(row);
     ctlEls[c.symbol] = { set: v => { sl.set(v); setN(v); val.textContent = fmt(c, v); } };
   }
+  if (c.help) box.append(el("p", "ctl-help", c.help));
   return box;
 }
 function updateControl(sym, v) { ctlEls[sym]?.set(v); }

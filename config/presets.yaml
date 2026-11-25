@@ -83,7 +83,11 @@ x-broadcast:
   nr: &bc_nr { id: nr, name: Noise suppression, uri: "https://github.com/werman/noise-suppression-for-voice#mono", bypass: true,
     main: [vad_threshold, vad_grace_period, vad_retroactive_grace_period],
     labels: { vad_threshold: Voice detection threshold, vad_grace_period: "Hold after the voice (x 10 ms)",
-      vad_retroactive_grace_period: "Keep before the voice (x 10 ms)" } }
+      vad_retroactive_grace_period: "Keep before the voice (x 10 ms)" },
+    info: "Mutes the output when it hears no voice (the pauses) and lowers steady noise under the voice. These controls only change the voice detection; the reduction itself is fixed. Off by default: switch it on and compare on a second receiver.",
+    help: { vad_threshold: "Probability of voice below which the output is muted. Higher: quieter pauses, but weak syllables and word ends may be cut. Lower: more noise gets through. Default 0.6.",
+      vad_grace_period: "Stays open this long after the voice stops, so word ends are not cut. Fans heard at the end of phrases: lower it (10-15). Default 20 = 200 ms.",
+      vad_retroactive_grace_period: "Keeps this much audio from before the voice was detected, so word starts are kept (s, p). Adds the same delay: 3 = +30 ms. Default 0." } }
   phase: &bc_phase { id: phase, name: Phase rotator, uri: "http://gareus.org/oss/lv2/phaserotate", main: [angle],
     params: { angle: 120 } }
   # gate: closes 6 dB below the open threshold (ht is relative), -40 dB when closed, 5 ms
