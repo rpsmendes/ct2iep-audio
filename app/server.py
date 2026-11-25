@@ -114,13 +114,15 @@ def load_builtin(factory: Factory, path: Path):
                 params = dict(spec["params"]) if spec and spec["uri"] == uri else {}
                 params.update({k: parse_value(v) for k, v in (b.get("params") or {}).items()})
                 blk = {"id": b["id"], "uri": uri, "bypass": bool(b.get("bypass", False)), "params": params}
-                if b.get("name"):
-                    blk["name"] = b["name"]
+                for k in ("name", "main", "meters", "labels"):
+                    if b.get(k):
+                        blk[k] = b[k]
                 blocks.append(blk)
         except (KeyError, TypeError, ValueError) as e:
             log.warning("built-in preset %r skipped: %s", p.get("name"), e)
             continue
         out.append({"slug": slugify(p["name"], 60), "name": p["name"], "mode": p.get("mode", ""),
+                    "group": p.get("group", "Built-in"),
                     "radio": p.get("radio", ""), "description": p.get("description", ""),
                     "state": {"version": STATE_VERSION, "chain_bypass": False, "blocks": blocks}})
     return out
@@ -154,6 +156,16 @@ def normalize_block(app, b):
            "params": {}}
     if b.get("name"):
         out["name"] = str(b["name"])
+    # blocks that are not in chain.yaml may say which controls are shown first,
+    # what they are called and which meters they have (set by built-in presets;
+    # kept in user presets)
+    if isinstance(b.get("main"), list):
+        out["main"] = [str(x) for x in b["main"]]
+    if isinstance(b.get("meters"), list):
+        out["meters"] = [{k: m[k] for k in ("symbol", "label", "kind") if k in m}
+                         for m in b["meters"] if isinstance(m, dict) and m.get("symbol")]
+    if isinstance(b.get("labels"), dict):
+        out["labels"] = {str(k): str(v) for k, v in b["labels"].items()}
     if not plugin_available(out["uri"]):
         out["params"] = {k: float(v) for k, v in (b.get("params") or {}).items()}
         return out
@@ -258,17 +270,23 @@ def block_view(app, b):
     syms = [c["symbol"] for c in meta["controls"]]
     if spec and spec["main"]:
         main = [s for s in spec["main"] if s in syms]
+    elif b.get("main"):
+        main = [s for s in b["main"] if s in syms]
     else:
         main = syms if len(syms) <= 10 else syms[:8]
     meters = resolve_meters(meta, spec["meters"] if spec and spec["meters"] is not None
+                            else b.get("meters") if b.get("meters") is not None
                             else lv2meta.auto_meters(meta))
+    labels = b.get("labels") or {}
+    controls = [dict(c, name=labels[c["symbol"]]) if c["symbol"] in labels else c
+                for c in meta["controls"]]
     graph = meta["graph"] and b["uri"] not in response.BROKEN and \
         (spec["graph"] if spec and spec["graph"] is not None else True)
     v.update({"name": (spec and spec["name"]) or b.get("name") or meta["name"],
               "replaces": spec["replaces"] if spec else "", "plugin": meta["name"],
               "class": meta["class"], "graph": bool(graph), "main": main,
               "graph_unsupported": bool(meta["eq_like"] and not graph),
-              "controls": meta["controls"], "defaults": defaults_for(app, b), "meters": meters,
+              "controls": controls, "defaults": defaults_for(app, b), "meters": meters,
               "stereo": len(meta["audio_in"]) > 1})
     return v
 
@@ -1014,7 +1032,7 @@ async def h_library(request):
 
 async def h_presets(request):
     names = sorted(p.stem for p in presets_dir().glob("*.json"))
-    builtin = [{k: p[k] for k in ("slug", "name", "mode", "radio", "description")}
+    builtin = [{k: p[k] for k in ("slug", "name", "mode", "radio", "description", "group")}
                for p in request.app["builtin"]]
     return web.json_response({"presets": names, "builtin": builtin})
 

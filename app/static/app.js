@@ -348,7 +348,8 @@ function renderMeters() {
       const d = el("div", "meter" + (mt.kind === "gr" ? " gr" : "") + (off ? " off" : ""));
       d.title = mt.kind === "gr" ? `${mt.label}: gain reduction` : `${mt.label}: level`;
       const top = el("div", "top"); const v = el("span", "val", "—");
-      top.append(el("span", null, mt.kind === "gr" ? "GR" : mt.label), v);
+      const manyGr = b.meters.filter(m => m.kind === "gr").length > 1;   // e.g. multiband: one per band
+      top.append(el("span", null, mt.kind === "gr" ? (manyGr ? `GR ${mt.label}` : "GR") : mt.label), v);
       const bar = el("div", "bar"); const f = el("div", "fill"); bar.append(f); d.append(top, bar); box.append(d);
       meterEls[`${b.id}.${mt.symbol}`] = { mt, v, f };
     }
@@ -385,7 +386,10 @@ async function loadPresets() {
     for (const [v, t] of items) { const o = el("option", null, t); o.value = v; g.append(o); }
     sel.append(g);
   };
-  group("Built-in", PRESETS.builtin.map(p => ["b:" + p.slug, p.mode ? `${p.name} · ${p.mode}` : p.name]));
+  // built-in presets in their groups (config/presets.yaml "group"), in file order
+  const groups = [...new Set(PRESETS.builtin.map(p => p.group || "Built-in"))];
+  for (const g of groups)
+    group(g, PRESETS.builtin.filter(p => (p.group || "Built-in") === g).map(p => ["b:" + p.slug, p.mode ? `${p.name} · ${p.mode}` : p.name]));
   group("Saved", r.presets.map(n => ["u:" + n, n]));
   if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
   presetInfo();

@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Built-in presets can have a `group` (shown as a separate group in the preset
+  list), and blocks that are not in `chain.yaml` can set their main controls,
+  control `labels` and meters. Blocks with several gain-reduction meters show
+  them with their labels.
 - **Zeus · Square SDR (TCI)** output (Card tab → *Output*): sends the chain's
   audio to Zeus as TCI TX audio (`app/zeus_tci.py`, JACK client `out_ZEUS_0`,
   48 kHz mono float32), to transmit with the UA22 mic while Zeus is operated
