@@ -27,7 +27,11 @@
 # Signal path (each step has one job, so nothing is pushed into distortion):
 #   hpf     48 dB/oct high-pass at 45-70 Hz: removes rumble and the sub-bass
 #           part of plosives, which use power and ALC without being heard
-#   gate    soft expander (-12 dB) so the compression does not lift room noise
+#   gate    -40 dB in the pauses: the leveler and the compressor add ~30 dB of
+#           gain, so without it fans and power supplies come up between words.
+#           Opens at -45 dBFS, closes 6 dB lower, 5 ms look-ahead (onsets are
+#           not cut), detector high-passed at 200 Hz (ignores hum). Set the
+#           threshold ~6 dB above the gate's Input meter in silence.
 #   phase   x42 Phaserotate 120 deg: voice is asymmetric (one polarity peaks
 #           several dB higher); rotated it is symmetric, measured -1.5 dB peak
 #           on the test voice, more on most real voices
@@ -41,6 +45,8 @@
 #   mbc     4-band compressor (160 / 800 / 2400 Hz): each band is controlled
 #           on its own, so the bass can be dense without pumping the voice and
 #           without eating the transmitter's peak power
+#   exciter Calf Exciter, low amount: harmonics of the 2 kHz+ range give clarity
+#           and articulation without more 200-500 Hz (against a "muddy" voice)
 #   deesser sibilance control (more top end = more "s")
 #   lpf     steep low-pass at the bandwidth edge, before the limiter (a filter
 #           after the limiter would add overshoot)
@@ -48,8 +54,9 @@
 #           left, about 2 % of the time, at most ~8 dB on 10 ms word onsets
 #           (inaudible); it is not used to make the voice louder
 # Measured on a test voice (peak to loud-speech RMS): raw voice 17 dB, these
-# presets 12-14 dB, i.e. 3-5 dB more talk power at the same peak power, with
-# the 63-160 Hz band 2-5 dB up on the voice.
+# presets 12.5-14.5 dB, i.e. 3-5 dB more talk power at the same peak power,
+# with the 63-160 Hz band 2-5 dB up and 250-400 Hz ~2 dB down on the voice.
+# Latency of the whole chain: about 60 ms (look-aheads and filters).
 # The level to the radio is then set with the Output trim (Chain tab), until
 # the radio's ALC barely moves on voice peaks. Radio: speech processor, TX EQ
 # and (Zeus) leveler / compressor / CFC OFF, so they do not stack.
@@ -69,7 +76,10 @@ x-broadcast:
   hpf: &bc_hpf { id: hpf, name: High-pass, uri: "http://lsp-plug.in/plugins/lv2/filter_mono", main: [f, s] }
   phase: &bc_phase { id: phase, name: Phase rotator, uri: "http://gareus.org/oss/lv2/phaserotate", main: [angle],
     params: { angle: 120 } }
-  gate: &bc_gate { id: gate, params: { gt: "-50dB", gr: "-12dB", at: 5, rt: 300, gh: 1, ht: "-56dB" } }
+  # gate: closes 6 dB below the open threshold (ht is relative), -40 dB when closed, 5 ms
+  # look-ahead so word onsets are not cut, detector high-passed at 200 Hz (ignores fan hum)
+  gate: &bc_gate { id: gate, params: { gt: "-45dB", ht: "-6dB", gr: "-40dB", at: 1, rt: 200, gh: 1,
+      sla: 5, scm: 1, scr: 20, shpm: 2, shpf: 200, slpm: 0 } }
   agc: &bc_agc { id: agc, name: Leveler (AGC), uri: "http://lsp-plug.in/plugins/lv2/compressor_mono",
     main: [al, cr, at, rt, mk], labels: { al: Threshold, cr: Ratio, at: Attack, rt: Release, mk: Makeup },
     meters: [{ symbol: rlm, label: AGC, kind: gr }],
@@ -87,29 +97,29 @@ x-broadcast:
       cbe_4: 1, sf_4: 800, cbe_5: 0, cbe_6: 1, sf_6: 2400, cbe_7: 0,
       g_in: "0.0dB", g_out: "0.0dB", al_0: "-24.0dB", cr_0: 3, at_0: 15, rt_0: 300,
       mk_0: "9.9dB", kn_0: "-9.0dB", ce_0: 1, scm_0: 1, cm_0: 0, sla_0: 5,
-      al_2: "-27.0dB", cr_2: 2.5, at_2: 8, rt_2: 200, mk_2: "6.1dB", kn_2: "-9.0dB",
+      al_2: "-27.0dB", cr_2: 2.5, at_2: 8, rt_2: 200, mk_2: "4.0dB", kn_2: "-9.0dB",
       ce_2: 1, scm_2: 1, cm_2: 0, sla_2: 5, al_4: "-30.0dB", cr_4: 3,
       at_4: 4, rt_4: 150, mk_4: "4.0dB", kn_4: "-9.0dB", ce_4: 1, scm_4: 1,
       cm_4: 0, sla_4: 5, al_6: "-33.0dB", cr_6: 3, at_6: 2, rt_6: 100,
-      mk_6: "5.8dB", kn_6: "-9.0dB", ce_6: 1, scm_6: 1, cm_6: 0, sla_6: 5 }
+      mk_6: "9.8dB", kn_6: "-9.0dB", ce_6: 1, scm_6: 1, cm_6: 0, sla_6: 5 }
   mbc-punch: &bc_mbc_punch { mode: 1, envb: 0, cbe_1: 0, cbe_2: 1, sf_2: 160, cbe_3: 0,
       cbe_4: 1, sf_4: 800, cbe_5: 0, cbe_6: 1, sf_6: 2400, cbe_7: 0,
       g_in: "0.0dB", g_out: "0.0dB", al_0: "-26.0dB", cr_0: 4, at_0: 12, rt_0: 200,
-      mk_0: "12.2dB", kn_0: "-9.0dB", ce_0: 1, scm_0: 1, cm_0: 0, sla_0: 5,
-      al_2: "-29.0dB", cr_2: 3.5, at_2: 6, rt_2: 150, mk_2: "8.9dB", kn_2: "-9.0dB",
+      mk_0: "11.7dB", kn_0: "-9.0dB", ce_0: 1, scm_0: 1, cm_0: 0, sla_0: 5,
+      al_2: "-29.0dB", cr_2: 3.5, at_2: 6, rt_2: 150, mk_2: "6.3dB", kn_2: "-9.0dB",
       ce_2: 1, scm_2: 1, cm_2: 0, sla_2: 5, al_4: "-32.0dB", cr_4: 4,
       at_4: 3, rt_4: 120, mk_4: "6.0dB", kn_4: "-9.0dB", ce_4: 1, scm_4: 1,
       cm_4: 0, sla_4: 5, al_6: "-35.0dB", cr_6: 4, at_6: 2, rt_6: 80,
-      mk_6: "9.8dB", kn_6: "-9.0dB", ce_6: 1, scm_6: 1, cm_6: 0, sla_6: 5 }
+      mk_6: "12.2dB", kn_6: "-9.0dB", ce_6: 1, scm_6: 1, cm_6: 0, sla_6: 5 }
   mbc-warm: &bc_mbc_warm { mode: 1, envb: 0, cbe_1: 0, cbe_2: 1, sf_2: 160, cbe_3: 0,
       cbe_4: 1, sf_4: 800, cbe_5: 0, cbe_6: 1, sf_6: 2400, cbe_7: 0,
       g_in: "0.0dB", g_out: "0.0dB", al_0: "-22.0dB", cr_0: 2, at_0: 20, rt_0: 400,
-      mk_0: "7.4dB", kn_0: "-9.0dB", ce_0: 1, scm_0: 1, cm_0: 0, sla_0: 5,
-      al_2: "-25.0dB", cr_2: 2, at_2: 10, rt_2: 300, mk_2: "1.5dB", kn_2: "-9.0dB",
+      mk_0: "7.6dB", kn_0: "-9.0dB", ce_0: 1, scm_0: 1, cm_0: 0, sla_0: 5,
+      al_2: "-25.0dB", cr_2: 2, at_2: 10, rt_2: 300, mk_2: "2.9dB", kn_2: "-9.0dB",
       ce_2: 1, scm_2: 1, cm_2: 0, sla_2: 5, al_4: "-28.0dB", cr_4: 2,
       at_4: 6, rt_4: 250, mk_4: "2.0dB", kn_4: "-9.0dB", ce_4: 1, scm_4: 1,
       cm_4: 0, sla_4: 5, al_6: "-31.0dB", cr_6: 2, at_6: 3, rt_6: 150,
-      mk_6: "2.5dB", kn_6: "-9.0dB", ce_6: 1, scm_6: 1, cm_6: 0, sla_6: 5 }
+      mk_6: "5.8dB", kn_6: "-9.0dB", ce_6: 1, scm_6: 1, cm_6: 0, sla_6: 5 }
 
 presets:
   - name: SSB DX / Contest
@@ -318,21 +328,23 @@ presets:
       FTDX-101D: SSB TX BPF 50-3050. Square SDR (Zeus): TX filter 50-3000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
       set the level with the Output trim until the ALC barely moves.
     description: >-
-      Deepest low end: a shelf at 90 Hz and low-frequency harmonics give a big, round voice, with the 280 Hz "mud" and 650 Hz "box" taken out so it stays clear. Medium multiband density. Audio 60 Hz - 3 kHz.
+      Deepest low end: a shelf at 80 Hz and low-frequency harmonics give a big, round voice, with the 300 Hz "mud" and 600 Hz "box" taken out and a subtle exciter so it stays clear. Medium multiband density. Audio 60 Hz - 3 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 60 } }
       - *bc_gate
       - *bc_phase
       - *bc_agc
       - id: eq
-        params: { ft_0: 5, fm_0: 0, f_0: 90, s_0: 0, ft_1: 1, f_1: 280,
-            g_1: "-3.5dB", q_1: 1.2, ft_2: 1, f_2: 650, g_2: "-2.0dB", q_2: 1.5,
-            ft_3: 1, f_3: 2400, g_3: "2.0dB", mode: 0, g_0: "7.0dB", q_0: 0,
+        params: { ft_0: 5, fm_0: 0, f_0: 80, s_0: 0, ft_1: 1, f_1: 300,
+            g_1: "-5.0dB", q_1: 1, ft_2: 1, f_2: 600, g_2: "-2.5dB", q_2: 1.4,
+            ft_3: 1, f_3: 2400, g_3: "1.0dB", mode: 0, g_0: "7.0dB", q_0: 0,
             fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
             q_3: 0.8, ft_4: 0 }
       - id: bass
-        params: { amount: 1, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+        params: { amount: 0.6, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
       - { <<: *bc_mbc, params: *bc_mbc_deep }
+      - id: exciter
+        params: { amount: 0.8, blend: 0 }
       - id: deesser
         params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3000, mode: 1 }
       - id: lpf
@@ -347,22 +359,24 @@ presets:
       FTDX-101D: only with TTBF (hidden option, 50 Hz - 4 kHz). Square SDR (Zeus): TX filter 50-4000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
       set the level with the Output trim until the ALC barely moves.
     description: >-
-      Deepest low end: a shelf at 90 Hz and low-frequency harmonics give a big, round voice, with the 280 Hz "mud" and 650 Hz "box" taken out so it stays clear. Medium multiband density. Audio 50 Hz - 4 kHz.
+      Deepest low end: a shelf at 80 Hz and low-frequency harmonics give a big, round voice, with the 300 Hz "mud" and 600 Hz "box" taken out and a subtle exciter so it stays clear. Medium multiband density. Audio 50 Hz - 4 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 50 } }
       - *bc_gate
       - *bc_phase
       - *bc_agc
       - id: eq
-        params: { ft_0: 5, fm_0: 0, f_0: 90, s_0: 0, ft_1: 1, f_1: 280,
-            g_1: "-3.5dB", q_1: 1.2, ft_2: 1, f_2: 650, g_2: "-2.0dB", q_2: 1.5,
-            ft_3: 1, f_3: 2800, g_3: "2.0dB", mode: 0, g_0: "7.0dB", q_0: 0,
+        params: { ft_0: 5, fm_0: 0, f_0: 80, s_0: 0, ft_1: 1, f_1: 300,
+            g_1: "-5.0dB", q_1: 1, ft_2: 1, f_2: 600, g_2: "-2.5dB", q_2: 1.4,
+            ft_3: 1, f_3: 2800, g_3: "1.0dB", mode: 0, g_0: "7.0dB", q_0: 0,
             fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
             q_3: 0.8, ft_4: 3, fm_4: 0, s_4: 0, f_4: 3400, g_4: "1.5dB",
             q_4: 0 }
       - id: bass
-        params: { amount: 1, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+        params: { amount: 0.6, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
       - { <<: *bc_mbc, params: *bc_mbc_deep }
+      - id: exciter
+        params: { amount: 0.8, blend: 0 }
       - id: deesser
         params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3800, mode: 1 }
       - id: lpf
@@ -377,22 +391,24 @@ presets:
       Square SDR (Zeus): TX filter 50-5000 Hz. Not possible on the FTDX-101D. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
       set the level with the Output trim until the ALC barely moves.
     description: >-
-      Deepest low end: a shelf at 90 Hz and low-frequency harmonics give a big, round voice, with the 280 Hz "mud" and 650 Hz "box" taken out so it stays clear. Medium multiband density. Audio 45 Hz - 5 kHz.
+      Deepest low end: a shelf at 80 Hz and low-frequency harmonics give a big, round voice, with the 300 Hz "mud" and 600 Hz "box" taken out and a subtle exciter so it stays clear. Medium multiband density. Audio 45 Hz - 5 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 45 } }
       - *bc_gate
       - *bc_phase
       - *bc_agc
       - id: eq
-        params: { ft_0: 5, fm_0: 0, f_0: 90, s_0: 0, ft_1: 1, f_1: 280,
-            g_1: "-3.5dB", q_1: 1.2, ft_2: 1, f_2: 650, g_2: "-2.0dB", q_2: 1.5,
-            ft_3: 1, f_3: 3200, g_3: "2.0dB", mode: 0, g_0: "7.0dB", q_0: 0,
+        params: { ft_0: 5, fm_0: 0, f_0: 80, s_0: 0, ft_1: 1, f_1: 300,
+            g_1: "-5.0dB", q_1: 1, ft_2: 1, f_2: 600, g_2: "-2.5dB", q_2: 1.4,
+            ft_3: 1, f_3: 3200, g_3: "1.0dB", mode: 0, g_0: "7.0dB", q_0: 0,
             fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
             q_3: 0.8, ft_4: 3, fm_4: 0, s_4: 0, f_4: 4200, g_4: "1.5dB",
             q_4: 0 }
       - id: bass
-        params: { amount: 1, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+        params: { amount: 0.6, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
       - { <<: *bc_mbc, params: *bc_mbc_deep }
+      - id: exciter
+        params: { amount: 0.8, blend: 0 }
       - id: deesser
         params: { threshold: "-26.0dB", ratio: 4, f1_freq: 4500, mode: 1 }
       - id: lpf
@@ -407,19 +423,21 @@ presets:
       FTDX-101D: SSB TX BPF 50-3050. Square SDR (Zeus): TX filter 50-3000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
       set the level with the Output trim until the ALC barely moves.
     description: >-
-      Tight, firm low end at 140 Hz (high-pass a little higher, no sub-bass), forward presence and the densest compression: full-bodied but cuts through noise and QRM. Audio 80 Hz - 3 kHz.
+      Tight, firm low end at 120 Hz (high-pass a little higher, no sub-bass), 350 Hz cut, forward presence with an exciter and the densest compression: full-bodied but cuts through noise and QRM. Audio 80 Hz - 3 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 80 } }
       - *bc_gate
       - *bc_phase
       - *bc_agc
       - id: eq
-        params: { ft_0: 1, fm_0: 0, f_0: 140, s_0: 0, ft_1: 1, f_1: 380,
-            g_1: "-3.0dB", q_1: 1.2, ft_2: 1, f_2: 900, g_2: "-1.0dB", q_2: 1.5,
-            ft_3: 1, f_3: 2400, g_3: "4.0dB", mode: 0, g_0: "5.0dB", q_0: 1,
+        params: { ft_0: 1, fm_0: 0, f_0: 120, s_0: 0, ft_1: 1, f_1: 350,
+            g_1: "-4.5dB", q_1: 1, ft_2: 1, f_2: 900, g_2: "-1.0dB", q_2: 1.5,
+            ft_3: 1, f_3: 2400, g_3: "3.0dB", mode: 0, g_0: "5.0dB", q_0: 1.2,
             fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
             q_3: 0.9, ft_4: 0 }
       - { <<: *bc_mbc, params: *bc_mbc_punch }
+      - id: exciter
+        params: { blend: 0 }
       - id: deesser
         params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3000, mode: 1 }
       - id: lpf
@@ -434,20 +452,22 @@ presets:
       FTDX-101D: only with TTBF (hidden option, 50 Hz - 4 kHz). Square SDR (Zeus): TX filter 50-4000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
       set the level with the Output trim until the ALC barely moves.
     description: >-
-      Tight, firm low end at 140 Hz (high-pass a little higher, no sub-bass), forward presence and the densest compression: full-bodied but cuts through noise and QRM. Audio 70 Hz - 4 kHz.
+      Tight, firm low end at 120 Hz (high-pass a little higher, no sub-bass), 350 Hz cut, forward presence with an exciter and the densest compression: full-bodied but cuts through noise and QRM. Audio 70 Hz - 4 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 70 } }
       - *bc_gate
       - *bc_phase
       - *bc_agc
       - id: eq
-        params: { ft_0: 1, fm_0: 0, f_0: 140, s_0: 0, ft_1: 1, f_1: 380,
-            g_1: "-3.0dB", q_1: 1.2, ft_2: 1, f_2: 900, g_2: "-1.0dB", q_2: 1.5,
-            ft_3: 1, f_3: 2800, g_3: "4.0dB", mode: 0, g_0: "5.0dB", q_0: 1,
+        params: { ft_0: 1, fm_0: 0, f_0: 120, s_0: 0, ft_1: 1, f_1: 350,
+            g_1: "-4.5dB", q_1: 1, ft_2: 1, f_2: 900, g_2: "-1.0dB", q_2: 1.5,
+            ft_3: 1, f_3: 2800, g_3: "3.0dB", mode: 0, g_0: "5.0dB", q_0: 1.2,
             fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
             q_3: 0.9, ft_4: 3, fm_4: 0, s_4: 0, f_4: 3400, g_4: "1.0dB",
             q_4: 0 }
       - { <<: *bc_mbc, params: *bc_mbc_punch }
+      - id: exciter
+        params: { blend: 0 }
       - id: deesser
         params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3800, mode: 1 }
       - id: lpf
@@ -462,20 +482,22 @@ presets:
       Square SDR (Zeus): TX filter 50-5000 Hz. Not possible on the FTDX-101D. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
       set the level with the Output trim until the ALC barely moves.
     description: >-
-      Tight, firm low end at 140 Hz (high-pass a little higher, no sub-bass), forward presence and the densest compression: full-bodied but cuts through noise and QRM. Audio 65 Hz - 5 kHz.
+      Tight, firm low end at 120 Hz (high-pass a little higher, no sub-bass), 350 Hz cut, forward presence with an exciter and the densest compression: full-bodied but cuts through noise and QRM. Audio 65 Hz - 5 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 65 } }
       - *bc_gate
       - *bc_phase
       - *bc_agc
       - id: eq
-        params: { ft_0: 1, fm_0: 0, f_0: 140, s_0: 0, ft_1: 1, f_1: 380,
-            g_1: "-3.0dB", q_1: 1.2, ft_2: 1, f_2: 900, g_2: "-1.0dB", q_2: 1.5,
-            ft_3: 1, f_3: 3200, g_3: "4.0dB", mode: 0, g_0: "5.0dB", q_0: 1,
+        params: { ft_0: 1, fm_0: 0, f_0: 120, s_0: 0, ft_1: 1, f_1: 350,
+            g_1: "-4.5dB", q_1: 1, ft_2: 1, f_2: 900, g_2: "-1.0dB", q_2: 1.5,
+            ft_3: 1, f_3: 3200, g_3: "3.0dB", mode: 0, g_0: "5.0dB", q_0: 1.2,
             fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
             q_3: 0.9, ft_4: 3, fm_4: 0, s_4: 0, f_4: 4200, g_4: "1.0dB",
             q_4: 0 }
       - { <<: *bc_mbc, params: *bc_mbc_punch }
+      - id: exciter
+        params: { blend: 0 }
       - id: deesser
         params: { threshold: "-26.0dB", ratio: 4, f1_freq: 4500, mode: 1 }
       - id: lpf
@@ -490,21 +512,23 @@ presets:
       FTDX-101D: SSB TX BPF 50-3050. Square SDR (Zeus): TX filter 50-3000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
       set the level with the Output trim until the ALC barely moves.
     description: >-
-      Smooth studio voice: warmth at 150-220 Hz, gentle 2:1 compression in every band, little presence. The most natural of the three. Audio 60 Hz - 3 kHz.
+      Smooth studio voice: warmth from a 130 Hz shelf, a light 330 Hz cut, gentle 2:1 compression in every band and only a touch of exciter. The most natural of the three. Audio 60 Hz - 3 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 60 } }
       - *bc_gate
       - *bc_phase
       - *bc_agc
       - id: eq
-        params: { ft_0: 5, fm_0: 0, f_0: 160, s_0: 0, ft_1: 1, f_1: 220,
-            g_1: "1.5dB", q_1: 1, ft_2: 1, f_2: 500, g_2: "-2.0dB", q_2: 1.2,
-            ft_3: 1, f_3: 2400, g_3: "1.0dB", mode: 0, g_0: "4.5dB", q_0: 0,
+        params: { ft_0: 5, fm_0: 0, f_0: 130, s_0: 0, ft_1: 1, f_1: 330,
+            g_1: "-2.5dB", q_1: 1, ft_2: 1, f_2: 700, g_2: "-1.0dB", q_2: 1.2,
+            ft_3: 1, f_3: 2400, g_3: "0.5dB", mode: 0, g_0: "4.5dB", q_0: 0,
             fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
             q_3: 0.7, ft_4: 0 }
       - id: bass
-        params: { drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+        params: { amount: 0.4, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
       - { <<: *bc_mbc, params: *bc_mbc_warm }
+      - id: exciter
+        params: { amount: 0.6, blend: 0 }
       - id: deesser
         params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3000, mode: 1 }
       - id: lpf
@@ -519,22 +543,24 @@ presets:
       FTDX-101D: only with TTBF (hidden option, 50 Hz - 4 kHz). Square SDR (Zeus): TX filter 50-4000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
       set the level with the Output trim until the ALC barely moves.
     description: >-
-      Smooth studio voice: warmth at 150-220 Hz, gentle 2:1 compression in every band, little presence. The most natural of the three. Audio 50 Hz - 4 kHz.
+      Smooth studio voice: warmth from a 130 Hz shelf, a light 330 Hz cut, gentle 2:1 compression in every band and only a touch of exciter. The most natural of the three. Audio 50 Hz - 4 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 50 } }
       - *bc_gate
       - *bc_phase
       - *bc_agc
       - id: eq
-        params: { ft_0: 5, fm_0: 0, f_0: 160, s_0: 0, ft_1: 1, f_1: 220,
-            g_1: "1.5dB", q_1: 1, ft_2: 1, f_2: 500, g_2: "-2.0dB", q_2: 1.2,
-            ft_3: 1, f_3: 2800, g_3: "1.0dB", mode: 0, g_0: "4.5dB", q_0: 0,
+        params: { ft_0: 5, fm_0: 0, f_0: 130, s_0: 0, ft_1: 1, f_1: 330,
+            g_1: "-2.5dB", q_1: 1, ft_2: 1, f_2: 700, g_2: "-1.0dB", q_2: 1.2,
+            ft_3: 1, f_3: 2800, g_3: "0.5dB", mode: 0, g_0: "4.5dB", q_0: 0,
             fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
             q_3: 0.7, ft_4: 3, fm_4: 0, s_4: 0, f_4: 3400, g_4: "0.5dB",
             q_4: 0 }
       - id: bass
-        params: { drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+        params: { amount: 0.4, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
       - { <<: *bc_mbc, params: *bc_mbc_warm }
+      - id: exciter
+        params: { amount: 0.6, blend: 0 }
       - id: deesser
         params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3800, mode: 1 }
       - id: lpf
@@ -549,22 +575,24 @@ presets:
       Square SDR (Zeus): TX filter 50-5000 Hz. Not possible on the FTDX-101D. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
       set the level with the Output trim until the ALC barely moves.
     description: >-
-      Smooth studio voice: warmth at 150-220 Hz, gentle 2:1 compression in every band, little presence. The most natural of the three. Audio 45 Hz - 5 kHz.
+      Smooth studio voice: warmth from a 130 Hz shelf, a light 330 Hz cut, gentle 2:1 compression in every band and only a touch of exciter. The most natural of the three. Audio 45 Hz - 5 kHz.
     blocks:
       - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 45 } }
       - *bc_gate
       - *bc_phase
       - *bc_agc
       - id: eq
-        params: { ft_0: 5, fm_0: 0, f_0: 160, s_0: 0, ft_1: 1, f_1: 220,
-            g_1: "1.5dB", q_1: 1, ft_2: 1, f_2: 500, g_2: "-2.0dB", q_2: 1.2,
-            ft_3: 1, f_3: 3200, g_3: "1.0dB", mode: 0, g_0: "4.5dB", q_0: 0,
+        params: { ft_0: 5, fm_0: 0, f_0: 130, s_0: 0, ft_1: 1, f_1: 330,
+            g_1: "-2.5dB", q_1: 1, ft_2: 1, f_2: 700, g_2: "-1.0dB", q_2: 1.2,
+            ft_3: 1, f_3: 3200, g_3: "0.5dB", mode: 0, g_0: "4.5dB", q_0: 0,
             fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
             q_3: 0.7, ft_4: 3, fm_4: 0, s_4: 0, f_4: 4200, g_4: "0.5dB",
             q_4: 0 }
       - id: bass
-        params: { drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+        params: { amount: 0.4, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
       - { <<: *bc_mbc, params: *bc_mbc_warm }
+      - id: exciter
+        params: { amount: 0.6, blend: 0 }
       - id: deesser
         params: { threshold: "-26.0dB", ratio: 4, f1_freq: 4500, mode: 1 }
       - id: lpf

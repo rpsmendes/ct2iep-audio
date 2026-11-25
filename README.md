@@ -220,17 +220,18 @@ ct2iep-station, port 7080).
 
   A second group, **Broadcast SSB**, has three characters, each in 3, 4 and
   5 kHz versions (same chain, the EQ top end, de-esser and low-pass follow the
-  bandwidth). The chain: 48 dB/oct high-pass → soft gate → phase rotator
-  (x42, 120°, makes the voice peaks symmetric) → look-ahead leveler (AGC) →
-  EQ → bass enhancer → 4-band compressor (160 / 800 / 2400 Hz) → de-esser →
-  steep low-pass → look-ahead limiter at −1 dBFS (2× oversampled).
+  bandwidth). The chain: 48 dB/oct high-pass → gate (−40 dB in the pauses) →
+  phase rotator (x42, 120°, makes the voice peaks symmetric) → look-ahead
+  leveler (AGC) → EQ → bass enhancer → 4-band compressor (160 / 800 /
+  2400 Hz) → exciter (low amount) → de-esser → steep low-pass → look-ahead
+  limiter at −1 dBFS (2× oversampled). Latency about 60 ms.
   Needs the LSP, Calf and x42 plugins of the image.
 
   | Preset | Character | Bass |
   |---|---|---|
-  | Broadcast Deep | big, round voice; mud (280 Hz) and box (650 Hz) cut | shelf at 90 Hz + harmonics, slow bass band |
-  | Broadcast Punch | forward and dense, cuts through the band | tight bump at 140 Hz, high-pass 20 Hz higher, faster bands |
-  | Broadcast Warm | soft, relaxed, lightest compression | wide shelf at 160 Hz + light harmonics |
+  | Broadcast Deep | big, round voice; mud (300 Hz) and box (600 Hz) cut | shelf at 80 Hz + harmonics, slow bass band |
+  | Broadcast Punch | forward and dense, cuts through the band | tight bump at 120 Hz, high-pass 20 Hz higher, faster bands |
+  | Broadcast Warm | soft, relaxed, lightest compression | wide shelf at 130 Hz + light harmonics |
 
   Measured on a test voice: peak to loud-speech RMS from 17 dB (raw) to
   12–14 dB, i.e. 3–5 dB more talk power at the same peak power; the limiter
@@ -244,6 +245,15 @@ ct2iep-station, port 7080).
 
   On the radio: speech processor, TX EQ and (Zeus) leveler / compressor / CFC
   off; set the level with the **Output trim** until the ALC barely moves.
+
+  **Gate and room noise** (fans, power supplies): the leveler and the
+  compressor add about 30 dB of gain, so whatever the gate lets through in the
+  pauses comes up with them. Set it once for your room: stay silent and read
+  the gate's **Input** meter, then set the threshold (*Curve threshold*) about
+  6 dB above that reading; speak normally and check that word starts and ends
+  are not cut. *Reduction* is how far the noise goes down in the pauses. The
+  gate cannot remove the noise *under* the voice: for that, keep the mic close
+  (3–5 cm) and the fans behind its dead side (the back of a cardioid).
   With a dynamic mic (e.g. FDUCE SL40X) the depth comes from the proximity
   effect: 3–5 cm, always at the same distance, slightly off-axis, with a
   pop filter.
