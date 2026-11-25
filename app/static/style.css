@@ -309,3 +309,5 @@ code { font-family: var(--mono); font-size: 12px; }
 .lvl-opt { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; cursor: pointer; }
 .lvl-opt input { accent-color: var(--accent); }
 .box-right button, .box-right select { color: var(--text); }
+.badge.unusable { color: var(--warn); border-color: rgba(242, 201, 76, .4); }
+.pkg-usable { color: var(--ok); }

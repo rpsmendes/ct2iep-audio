@@ -224,6 +224,26 @@ ct2iep-station, port 7080).
   engine restarts. Several browsers at the same time stay in sync.
 
 ### Plugins (packages on demand)
+
+**Which plugins are offered.** The chain is one mono voice path, so by default
+the plugin lists (the **+** dialog and *Installed plugins*) only show plugins
+that can do something useful in it: voice processing (EQ, filters, dynamics,
+de-esser, exciter, saturation, limiter…) and creative effects (reverb, delay,
+modulation). *All plugins* in the list's filter shows the rest, each with the
+reason it is not offered:
+
+| Reason | Examples |
+|---|---|
+| visual only (meter / analyser) | x42 meters, LSP spectrum analyzer, tuner: the sound passes unchanged and the display needs the plugin's own GUI |
+| needs a sidechain signal | LSP *Sidechain* …, Calf Sidechain …: the chain leaves that input empty |
+| needs a file | convolvers, impulse reverbs, Room Builder, Profiler |
+| needs several inputs / stereo utility | mixers, A/B tester, crossovers, Haas, balance, delay lines |
+| generator, MIDI, instrument | noise generator, oscillator, trigger, samplers |
+| stereo version: use the mono one | LSP/x42 *Stereo*, *LeftRight*, *MidSide* versions when a mono one exists |
+
+The rules are in `app/lv2meta.py` (`_categorize`) and use the LV2 metadata, so
+packages installed from the UI are classified too. Each package card shows how
+many of its plugins are usable in the chain.
 The **Plugins** tab installs and removes Debian packages of LV2 plugins
 **without rebuilding the image**: a suggested catalog for voice (ZAM, SWH, MDA,
 FOMP, EQ10Q, Invada, abGate) plus a field for any other package. The package is

@@ -15,6 +15,7 @@ import glob
 import json
 import logging
 import os
+import subprocess
 import re
 import shutil
 import tempfile
@@ -147,6 +148,21 @@ async def _depends(pkg, logl):
     return deps
 
 
+_base_bundles = {}
+
+
+def base_bundles(pkg):
+    """LV2 bundles of a package of the image (dpkg -L), cached."""
+    if pkg not in _base_bundles:
+        try:
+            out = subprocess.run(["dpkg", "-L", pkg], capture_output=True, text=True, timeout=10).stdout
+        except (OSError, subprocess.SubprocessError):
+            out = ""
+        _base_bundles[pkg] = sorted({os.path.basename(ln.rstrip("/")) for ln in out.splitlines()
+                                     if ln.rstrip("/").endswith(".lv2")})
+    return _base_bundles[pkg]
+
+
 async def status(used_uris=()):
     import lv2meta  # avoids a circular import at startup
     installed = {m["pkg"]: m for m in _manifests()}
@@ -167,7 +183,7 @@ async def status(used_uris=()):
         m = installed.get(pkg)
         state = "base" if pkg in BASE else ("installed" if m else "available")
         items.append({**c, "state": state, "version": m["version"] if m else None,
-                      "bundles": m["bundles"] if m else [], "missing_libs": m.get("missing_libs", []) if m else [],
+                      "bundles": m["bundles"] if m else (base_bundles(pkg) if pkg in BASE else []), "missing_libs": m.get("missing_libs", []) if m else [],
                       "in_use": bool(in_use.get(pkg))})
     return {"packages": items}
 

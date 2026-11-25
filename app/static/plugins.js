@@ -6,7 +6,9 @@ const LIB = { list: null, at: null };
 
 async function loadLibrary(force) {
   if (!LIB.list || force) LIB.list = (await api("GET", "/api/library")).plugins;
-  const n = $("#libCount"); if (n) n.textContent = `· ${LIB.list.length} plugins available`;
+  const n = $("#libCount");
+  if (n) n.textContent = `· ${LIB.list.length} plugins, ${LIB.list.filter(p => p.usable).length} usable in the chain`;
+  if (LIB.pkgs && !pkgBusy) renderPackages(LIB.pkgs);       // per-package "usable" counts
   return LIB.list;
 }
 
@@ -14,8 +16,11 @@ async function loadLibrary(force) {
 // Used in the "add a block" dialog and in the Plugins tab.
 const PAGE_SIZES = [20, 50, 100];
 function makeBrowser(root, opts) {
-  const st = { q: "", cls: "", src: "", page: 0, size: 20 };
-  try { st.size = +localStorage.getItem("ct2iep.libPageSize") || 20; } catch (_) { /* no storage */ }
+  const st = { q: "", cls: "", src: "", show: "usable", page: 0, size: 20 };
+  try {
+    st.size = +localStorage.getItem("ct2iep.libPageSize") || 20;
+    st.show = localStorage.getItem("ct2iep.libShow") || "usable";
+  } catch (_) { /* no storage */ }
   root.innerHTML = "";
   const filters = el("div", "lib-filters");
   const q = el("input"); q.type = "search"; q.placeholder = "Search (name, author, type, package)…"; q.autocomplete = "off";
@@ -24,13 +29,16 @@ function makeBrowser(root, opts) {
   cls.innerHTML = '<option value="">All types</option>';
   const src = el("select"); src.setAttribute("aria-label", "Source");
   src.innerHTML = '<option value="">All sources</option><option value="base">In the image</option><option value="extra">Installed from the UI</option>';
-  filters.append(q, cls, src);
+  // by default only the plugins that make sense in a mono voice chain
+  const show = el("select"); show.setAttribute("aria-label", "Which plugins");
+  show.title = "Meters, sidechain, file-based, multi-input, MIDI and stereo-only plugins cannot do anything useful in this mono chain";
+  filters.append(q, show, cls, src);
   const info = el("div", "lib-info-row muted small");
   const list = el("div", "lib-list");
   const pager = el("div", "pager");
   root.append(filters, info, list, pager);
 
-  const filtered = () => (LIB.list || []).filter(p => (!st.cls || p.class === st.cls) &&
+  const filtered = () => (LIB.list || []).filter(p => (st.show === "all" || p.usable) && (!st.cls || p.class === st.cls) &&
     (!st.src || (st.src === "extra") === !!p.extra) &&
     (!st.q || `${p.name} ${p.author} ${p.class} ${p.bundle} ${p.uri}`.toLowerCase().includes(st.q)));
 
@@ -50,8 +58,9 @@ function makeBrowser(root, opts) {
       badges.append(el("span", "badge", p.ins > 1 ? "stereo" : "mono"));
       if (p.sidechain) badges.append(el("span", "badge", "sidechain"));
       if (p.extra) badges.append(el("span", "badge extra", "extra package"));
+      if (!p.usable) { const nb = el("span", "badge unusable", p.category_label); nb.title = "Not useful in this mono chain"; badges.append(nb); }
       title.append(badges);
-      const sub = el("div", "muted small", [p.class, p.author, p.bundle].filter(Boolean).join(" · "));
+      const sub = el("div", "muted small", [p.usable ? p.category_label : null, p.class, p.author, p.bundle].filter(Boolean).join(" · "));
       sub.title = p.uri;
       inf.append(title, sub);
       const add = el("button", null, "Add");
@@ -83,6 +92,12 @@ function makeBrowser(root, opts) {
     }
   }
   function fillClasses() {
+    const usable = (LIB.list || []).filter(p => p.usable).length, all = (LIB.list || []).length;
+    show.innerHTML = "";
+    for (const [v, t] of [["usable", `Usable in the chain (${usable})`], ["all", `All plugins (${all})`]]) {
+      const o = el("option", null, t); o.value = v; show.append(o);
+    }
+    show.value = st.show;
     const cur = st.cls;
     const classes = [...new Set((LIB.list || []).map(p => p.class))].sort();
     cls.innerHTML = '<option value="">All types</option>';
@@ -92,6 +107,10 @@ function makeBrowser(root, opts) {
   q.addEventListener("input", () => { st.q = q.value.trim().toLowerCase(); st.page = 0; render(); });
   cls.addEventListener("change", () => { st.cls = cls.value; st.page = 0; render(); });
   src.addEventListener("change", () => { st.src = src.value; st.page = 0; render(); });
+  show.addEventListener("change", () => {
+    st.show = show.value; st.page = 0; render();
+    try { localStorage.setItem("ct2iep.libShow", st.show); } catch (_) { /* no storage */ }
+  });
   return {
     async load(force) {
       list.innerHTML = '<p class="muted">Loading the library…</p>';
@@ -191,6 +210,13 @@ function renderPackages(pkgs, installing, removing) {
     const state = { base: "in the image", installed: `installed${p.version ? " · " + p.version : ""}`, available: "not installed" }[p.state];
     head.append(t, el("span", "badge " + p.state, state));
     card.append(head, el("div", "muted small", p.desc));
+    if (LIB.list && p.bundles?.length) {
+      const mine = LIB.list.filter(x => p.bundles.includes(x.bundle));
+      if (mine.length) {
+        const u = mine.filter(x => x.usable).length;
+        card.append(el("div", "small " + (u ? "pkg-usable" : "muted"), `${u} of ${mine.length} plugins usable in the chain`));
+      }
+    }
     if (p.missing_libs?.length) card.append(el("div", "small warn-text", `Missing libraries: ${p.missing_libs.join(", ")}`));
     if (p.in_use) card.append(el("div", "small muted", "In use in the chain."));
     const btnRow = el("div", "pkg-actions");

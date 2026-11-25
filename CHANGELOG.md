@@ -45,6 +45,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (green, red for errors) and a footer line. Header chips: **ENGINE ON / OFF /
   NO LINK**, **BYPASS** while A/B is on, **CLIP** (blinking) while the card input
   or the output to the radio clips.
+- **Plugin lists show only the plugins usable in the chain** by default
+  (~70 of ~300): meters/analysers, sidechain, file-based, multi-input, MIDI,
+  generator and stereo-only plugins, and stereo versions of plugins that exist
+  in mono, are hidden; *All plugins* shows them with the reason. Classified from
+  the LV2 metadata (`lv2meta._categorize`); checked on 2026-11-25 against every
+  plugin of the image (all load in mod-host; meters leave the signal unchanged).
+  Package cards show "N of M plugins usable in the chain".
 - **Blocks in a grid instead of a horizontal strip**: they wrap in rows (two
   columns on a phone), numbered in signal order; each block shows its own
   meters (GR, input/output level) instead of a separate row of meters; dragging
