@@ -60,9 +60,59 @@ function renderLevels(lv) {
       lab.append(cb, document.createTextNode(" Left channel only"));
       g.append(lab);
       LV.els.out.cb = cb;
+      g.append(toneControls());
     }
     box.append(g);
   }
+}
+
+// ---------- test tone ----------
+// Replaces the chain's audio before the Output trim, at the limiter's peak
+// (-1 dBFS), to set the level into the radio by its power/ALC meters.
+const TONE = { cur: { mode: "off", left: 0, available: true }, el: null, tick: null, until: 0 };
+
+function toneControls() {
+  const box = el("div", "tone");
+  const head = el("div", "lvl-head");
+  const state = el("span", "tone-state muted");
+  head.append(el("strong", null, "Test tone"), el("span", "muted small", "instead of the chain, same −1 dBFS peak"), state);
+  const row = el("div", "tone-row");
+  const mk = (mode, label, title) => {
+    const b = el("button", null, label); b.type = "button"; b.dataset.mode = mode; b.title = title;
+    b.onclick = () => send({ type: "tone", mode: TONE.cur.mode === mode ? "off" : mode });
+    row.append(b); return b;
+  };
+  const btns = [
+    mk("one", "1 kHz", "One tone at the chain's peak level: transmit (low power or dummy load) and raise the Output trim until the power stops rising and the ALC starts to move, then back off 2-3 dB."),
+    mk("two", "Two-tone 700 + 1900 Hz", "Two equal tones, same total peak: look at the signal on a receiver or WebSDR; the intermodulation products (every 1200 Hz either side) show how linear the transmitter is."),
+  ];
+  const stop = el("button", "ghost", "Stop"); stop.type = "button"; stop.onclick = () => send({ type: "tone", mode: "off" });
+  row.append(stop);
+  const hint = el("p", "hint small", "It does not key the radio: you transmit with PTT as usual. A tone is a full carrier: use low power or a dummy load and keep it short. Stops by itself after a minute.");
+  box.append(head, row, hint);
+  TONE.el = { state, btns, stop };
+  paintTone();
+  return box;
+}
+
+function paintTone() {
+  const t = TONE.cur, e = TONE.el;
+  const on = t.mode !== "off";
+  $("#toneChip").hidden = !on;
+  if (!e) return;
+  for (const b of e.btns) { b.setAttribute("aria-pressed", String(t.mode === b.dataset.mode)); b.disabled = !t.available; }
+  e.stop.disabled = !on;
+  const left = Math.max(0, Math.round((TONE.until - Date.now()) / 1000));
+  e.state.textContent = !t.available ? "generator not installed" : on ? `${t.mode === "one" ? "1 kHz" : "two-tone"} · ${left} s` : "off";
+  e.state.classList.toggle("muted", !on);
+}
+
+function setTone(t) {
+  if (!t) return;
+  TONE.cur = t; TONE.until = Date.now() + (t.left || 0) * 1000;
+  clearInterval(TONE.tick); TONE.tick = null;
+  if (t.mode !== "off") TONE.tick = setInterval(paintTone, 1000);
+  paintTone();
 }
 
 function updateLevelControls(lv) {
@@ -83,7 +133,8 @@ function paintLevel(m, d) {
   m.val.textContent = d <= -119 ? "−∞" : d.toFixed(1);
 }
 
-UI.hooks.chain.push(v => { if (v.levels) updateLevelControls(v.levels); });
+UI.hooks.chain.push(v => { if (v.levels) updateLevelControls(v.levels); if (v.tone) setTone(v.tone); });
+UI.hooks.tone.push(setTone);
 UI.hooks.levels.push(lv => updateLevelControls(lv));
 UI.hooks.meters.push(values => {
   const now = Date.now();

@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Test tone** (Chain tab, under the Output trim): 1 kHz or two-tone
+  700 + 1900 Hz at the limiter's −1 dBFS peak, instead of the chain and before
+  the Output trim, to set the level into the radio by its power/ALC meters and
+  to check its intermodulation. LSP Oscillator in mod-host, header chip TONE,
+  off by itself after 60 s.
 - **Broadcast SSB** built-in presets (own group in the preset list): Deep,
   Punch and Warm, each in 3, 4 and 5 kHz versions, for the FTDX-101D and the
   Square SDR (Zeus). Steep high-pass, phase rotator, look-ahead leveler, EQ,

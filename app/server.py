@@ -297,7 +297,7 @@ def chain_view(app):
     return {"chain_bypass": st["chain_bypass"], "online": app["engine"].online,
             "levels": dict(app["rt"]["levels"], available=bool(app["engine"].trims) or not app["engine"].online,
                            min_db=TRIM_MIN_DB, max_db=TRIM_MAX_DB),
-            "io": {"inputs": f.inputs, "outputs": f.outputs},
+            "io": {"inputs": f.inputs, "outputs": f.outputs}, "tone": tone_view(app),
             "blocks": [block_view(app, b) for b in st["blocks"]]}
 
 
@@ -386,6 +386,22 @@ TRIM_MIN_DB, TRIM_MAX_DB = -36.0, 12.0
 LEVELS_DEFAULT = {"in_db": 0.0, "out_db": 0.0, "left_only": False}
 
 
+# Test tone: replaces the chain's audio before the Output trim, with the same peak
+# as the chain's limiter (-1 dBFS), to set the level into the radio by its
+# power/ALC meters. Two-tone (700 + 1900 Hz, equal amplitude, same total peak) to
+# look at the transmitter's intermodulation on a receiver. Turns itself off.
+TONE_URI = "http://lsp-plug.in/plugins/lv2/oscillator_mono"
+TONE_MODES = {"one": [(1000.0, -1.0)], "two": [(700.0, -7.02), (1900.0, -7.02)]}
+TONE_SECONDS = 60
+
+
+def tone_view(app):
+    t = app["rt"].get("tone") or {}
+    left = max(0, round(t["until"] - asyncio.get_running_loop().time())) if t.get("mode") else 0
+    return {"mode": t.get("mode") or "off", "left": left, "seconds": TONE_SECONDS,
+            "available": plugin_available(TONE_URI)}
+
+
 def load_levels():
     lv = dict(LEVELS_DEFAULT)
     try:
@@ -438,6 +454,7 @@ class Engine:
         self.failed = {}          # block id -> uri that failed to load (not retried)
         self.meter_values = {}
         self.trims = {}           # "in"/"out" -> mod-host instance (always loaded)
+        self.tone = []            # test tone oscillators (mod-host instances), when on
 
     async def cmd(self, line: str, quiet=False) -> str:
         async with self.lock:
@@ -510,6 +527,34 @@ class Engine:
             for sym in ("meter_in", "meter_outL", "clip_in", "clip_outL"):
                 await self.cmd(f"monitor_output {i} {sym}", quiet=True)
 
+    async def set_tone(self, mode):
+        """mode: "one", "two" or None. Loads the oscillators, then rewires (the
+        chain is disconnected from the Output trim while the tone plays)."""
+        old = self.tone
+        if mode:
+            new = []
+            for k, (freq, peak_db) in enumerate(TONE_MODES[mode]):
+                i = self.next_inst
+                self.next_inst += 1
+                r = await self.cmd(f'add "{TONE_URI}" {i}')
+                if r.startswith("resp -"):
+                    for j in new:
+                        await self.cmd(f"remove {j}", quiet=True)
+                    raise RuntimeError(f"mod-host refused the tone generator ({r[5:]})")
+                new.append(i)
+                # first oscillator replaces its (unconnected) input, the second adds to it
+                for sym, v in {"scm": 2 if k == 0 else 0, "scf": 0, "scom": 0, "dcoff": 0,
+                               "freq": freq, "gain": 10 ** (peak_db / 20)}.items():
+                    await self.cmd(f"param_set {i} {sym} {v:.6g}", quiet=True)
+            self.tone = new
+        else:
+            self.tone = []
+        await self.rewire()
+        for i in old:
+            pref = f"effect_{i}:"
+            self.links = {l for l in self.links if not (l[0].startswith(pref) or l[1].startswith(pref))}
+            await self.cmd(f"remove {i}", quiet=True)
+
     async def apply_levels(self):
         lv = self.app["rt"]["levels"]
         for stage, i in self.trims.items():
@@ -534,6 +579,11 @@ class Engine:
                 for a in meta["audio_in"]:
                     links.add((s, f"effect_{i}:{a}"))
             src = [f"effect_{i}:{meta['audio_out'][0]}"]
+        if self.tone:
+            # test tone instead of the chain (the chain keeps running, unconnected)
+            for a, b in zip(self.tone, self.tone[1:]):
+                links.add((f"effect_{a}:out", f"effect_{b}:in"))
+            src = [f"effect_{self.tone[-1]}:out"]
         if "out" in self.trims:
             i = self.trims["out"]
             for s in src:
@@ -582,6 +632,8 @@ class Engine:
     async def build(self):
         await self.cmd("remove -1")
         self.inst, self.links, self.errors, self.failed, self.next_inst = {}, set(), {}, {}, 0
+        self.tone = []
+        await stop_tone(self.app, rewire=False)
         await self.load_trims()
         await self.sync()
         await self.cmd("output_data_ready")
@@ -686,6 +738,50 @@ async def op_levels(app, m):
         async with app["rt"]["oplock"]:
             await eng.apply_levels()
     save_levels(lv)
+
+
+async def stop_tone(app, rewire=True):
+    t = app["rt"].get("tone") or {}
+    if t.get("timer"):
+        t["timer"].cancel()
+    was_on = bool(t.get("mode"))
+    app["rt"]["tone"] = {}
+    eng: Engine = app["engine"]
+    if rewire and eng.online and eng.tone:
+        await eng.set_tone(None)
+    if was_on:
+        await broadcast(app, {"type": "tone", "tone": tone_view(app)})
+
+
+async def op_tone(app, mode):
+    """Test tone on ("one" / "two") or off; switches itself off after TONE_SECONDS."""
+    mode = mode if mode in TONE_MODES else None
+    eng: Engine = app["engine"]
+    async with app["rt"]["oplock"]:
+        if not mode:
+            await stop_tone(app)
+            return
+        if not eng.online:
+            raise RuntimeError("the audio engine is not running")
+        if not plugin_available(TONE_URI):
+            raise RuntimeError("tone generator not installed (lsp-plugins-lv2)")
+        old = app["rt"].get("tone") or {}
+        if old.get("timer"):
+            old["timer"].cancel()
+        if eng.tone:
+            await eng.set_tone(None)
+        await eng.set_tone(mode)
+
+        async def auto_off():
+            await asyncio.sleep(TONE_SECONDS)
+            async with app["rt"]["oplock"]:
+                app["rt"]["tone"]["timer"] = None
+                await stop_tone(app)
+        loop = asyncio.get_running_loop()
+        app["rt"]["tone"] = {"mode": mode, "until": loop.time() + TONE_SECONDS,
+                             "timer": asyncio.create_task(auto_off())}
+    log.info("test tone %s on (%d s)", mode, TONE_SECONDS)
+    await broadcast(app, {"type": "tone", "tone": tone_view(app)})
 
 
 async def op_bypass(app, bid, value):
@@ -1196,6 +1292,8 @@ async def h_ws(request):
                 elif t == "levels":
                     await op_levels(app, m)
                     await broadcast(app, {"type": "levels", "levels": app["rt"]["levels"]}, exclude=ws)
+                elif t == "tone":
+                    await op_tone(app, m.get("mode"))
                 elif t == "chain_bypass":
                     await op_bypass(app, None, m["value"])
                     await broadcast(app, m, exclude=ws)

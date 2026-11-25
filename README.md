@@ -169,6 +169,16 @@ ct2iep-station, port 7080).
   The chain is mono and goes to both channels of each output. If the radio adds
   both channels of its USB input, **Left channel only** lowers the level by
   about 6 dB.
+- **Test tone** (under the Output trim): replaces the chain's audio, before the
+  Output trim, with a tone at the same −1 dBFS peak as the chain's limiter
+  (header chip **TONE**; it switches itself off after 60 s and never keys the
+  radio). **1 kHz** sets the level into the radio: transmit into a dummy load
+  (or low power), raise the Output trim until the power stops rising and the
+  ALC starts to move, then back off 2–3 dB; voice then peaks at the same
+  point. **Two-tone 700 + 1900 Hz** (two equal tones, same total peak) shows
+  the transmitter's linearity on a receiver or WebSDR: the intermodulation
+  products appear every 1200 Hz either side and should stay well below the
+  two tones (30 dB or more is clean). A tone is a full carrier: keep it short.
 - **Blocks**: a grid that wraps (no horizontal scrolling; two columns on a
   phone). The number on each block is its place in the signal path. Each block
   shows its own meters (gain reduction **GR**, input/output level). Click a
