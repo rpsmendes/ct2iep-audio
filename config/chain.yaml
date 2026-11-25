@@ -21,6 +21,14 @@ blocks:
     name: Gate
     replaces: Waves C1 gate
     uri: http://lsp-plug.in/plugins/lv2/gate_mono
+    info: "Mutes the room noise (fans, power supplies) in the pauses. Set it once for your room: stay silent, read this block's Input meter and set the threshold about 6 dB above it; then speak and check that word starts and ends are not cut."
+    help:
+      gt: "Opens above this level: about 6 dB above the Input meter reading in silence."
+      gr: "How far the noise goes down while the gate is closed: -40 dB is practically silent, -12 dB sounds more natural."
+      at: "How fast it opens when you start talking (1-2 ms)."
+      rt: "How fast it closes after the voice: too short cuts word ends, too long lets the fans in at the end of phrases (150-300 ms)."
+      gh: "Hysteresis: closes at a lower level than it opens, so it does not chatter on the noise."
+      ht: "With hysteresis: how much lower than the threshold it closes (relative to it). -6 dB is a good value."
     main: [gt, gr, at, rt, gh, ht]
     # ht (hysteresis) is relative to gt: the gate opens above gt and closes again
     # 6 dB lower. (It used to be -56 dB, i.e. closing only below -106 dBFS: once
@@ -34,6 +42,12 @@ blocks:
     name: Bass Enhancer
     replaces: Waves RBass
     uri: http://calf.sourceforge.net/plugins/BassEnhancer
+    info: "Adds harmonics of the lowest notes of the voice, so the bass is heard on receivers and small speakers that do not reproduce it. Too much makes the voice muddy: the harmonics land at 200-400 Hz."
+    help:
+      amount: "How much of the harmonics is added: small values (0.4-1)."
+      drive: "How rich the harmonics are."
+      freq: "Only the content below this frequency makes harmonics (100-150 Hz)."
+      level_out: "Output level."
     bypass: true          # lows are cut in SSB anyway; enable only if you want more "body"
     main: [amount, drive, freq, level_out]
     params: { amount: 0.5, drive: 4, freq: 180 }
@@ -42,6 +56,7 @@ blocks:
     name: Parametric EQ
     replaces: PuigTec MEQ5 + F6 + OneKnob Brighter
     uri: http://lsp-plug.in/plugins/lv2/para_equalizer_x8_mono
+    info: "The tone of the voice. Prefer cuts to boosts: 250-400 Hz removes mud, 500-800 Hz removes boxiness, a boost at 2-3 kHz adds presence. Big boosts are pressed back by the compressors that follow. The graph shows the real curve."
     # band 0: high-pass 120 Hz (Butterworth, -3 dB at 120 Hz)
     # band 1: "mud" cut at 300 Hz | band 2: presence at 1.8 kHz
     # band 3: brightness (high shelf) at 2.4 kHz
@@ -69,6 +84,14 @@ blocks:
     name: Compressor
     replaces: GW ToneCentric (dynamics)
     uri: http://lsp-plug.in/plugins/lv2/compressor_mono
+    info: "Evens out the level: loud syllables are brought down, then the makeup raises everything. More compression = more average power (talk power), less dynamics and more noise in the pauses."
+    help:
+      al: "Above this level it compresses. Watch the GR meter: 3-8 dB on voice peaks is typical."
+      cr: "How strongly: 2:1 gentle, 4:1 firm, above 8:1 it behaves like a limiter."
+      kn: "Knee: compression starts gradually around the threshold (more natural)."
+      at: "How fast it reacts to a peak: too fast dulls the voice, too slow lets syllable starts through."
+      rt: "How fast it lets go: short is denser but can pump, long is smoother."
+      mk: "Gain after the compressor, to bring the level back up."
     main: [al, cr, kn, at, rt, mk]
     params: { al: "-24dB", cr: 4, kn: "-6dB", at: 8, rt: 120, mk: "8dB" }
     meters:
@@ -78,6 +101,12 @@ blocks:
     name: Saturation
     replaces: GW ToneCentric (colour)
     uri: http://calf.sourceforge.net/plugins/Saturator
+    info: "Adds harmonic colour, like an analogue stage. Use it sparingly on SSB: more harmonics = more distortion products in the band."
+    help:
+      drive: "How hard it is driven: more = more harmonics."
+      blend: "Even (warm) versus odd (edgy) harmonics."
+      mix: "How much of the processed signal is mixed with the original."
+      level_out: "Output level."
     bypass: true
     main: [drive, blend, mix, level_out]
     params: { drive: 1.5, blend: 0, mix: 0.4 }
@@ -86,6 +115,12 @@ blocks:
     name: Exciter
     replaces: La Petite Excite
     uri: http://calf.sourceforge.net/plugins/Exciter
+    info: "Adds harmonics of the upper voice range (above 2 kHz) for clarity and articulation. On 3 kHz SSB most new harmonics fall outside the band and it mainly brightens 2-2.5 kHz. Keep it low."
+    help:
+      amount: "How much is added: small values (0.5-1)."
+      drive: "How rich the harmonics are."
+      freq: "Only the content above this frequency is processed (2 kHz minimum)."
+      blend: "Even (softer) versus odd (brighter) harmonics."
     main: [amount, drive, freq, blend]
     params: { amount: 1, drive: 6, freq: 2000 }
 
@@ -93,6 +128,14 @@ blocks:
     name: De-esser
     replaces: Waves DeEsser
     uri: http://calf.sourceforge.net/plugins/Deesser
+    info: "Lowers the s and sh sounds, which the presence boost and the compressors make louder. Its GR meter should only move on sibilants."
+    help:
+      threshold: "Lower = it also acts on softer sibilants."
+      ratio: "How strongly sibilants are lowered."
+      f1_freq: "Split: the sibilants above this frequency are detected and lowered. Near the top of your bandwidth."
+      f2_freq: "Centre of the sibilance detector."
+      f2_level: "Emphasis of the detector at that frequency."
+      makeup: "Gain after the de-esser."
     main: [threshold, ratio, f1_freq, f2_freq, f2_level, makeup]
     params: { threshold: "-18dB", ratio: 3, f1_freq: 2500, f2_freq: 2700, f2_level: 4 }
     meters:
@@ -102,6 +145,7 @@ blocks:
     name: Plate Reverb
     replaces: Abbey Road Plates
     uri: urn:dragonfly:plate
+    info: "Room / plate reverberation. Not for normal operation on the air: it blurs the voice. Leave it off."
     bypass: true          # reverb on TX usually hurts intelligibility
     main: [dry_level, early_level, decay, predelay]
     params: { dry_level: 100, early_level: 8, decay: 0.4 }
@@ -110,6 +154,10 @@ blocks:
     name: Low-pass (bandwidth)
     replaces: SSB bandwidth limit
     uri: http://lsp-plug.in/plugins/lv2/filter_mono
+    info: "Steep low-pass at the top of your TX bandwidth: nothing above it reaches the radio. Keep it before the limiter (after it, it would create peaks above the ceiling)."
+    help:
+      f: "Cut-off: the top of your TX bandwidth (e.g. 2.9 / 3.9 / 4.85 kHz)."
+      s: "Slope: steeper = cleaner band edge."
     main: [ft, fm, f, s]
     # Butterworth low-pass x4: -0.4 dB at 2.5 kHz, -3 dB at 2.9 kHz, -14 dB at 3.5 kHz
     params: { ft: 0, fm: 2, f: 2900, s: 3 }
@@ -118,6 +166,13 @@ blocks:
     name: Limiter
     replaces: Waves L1
     uri: http://lsp-plug.in/plugins/lv2/limiter_mono
+    info: "Last block: no peak goes above the ceiling, so the level into the radio is fixed and predictable. It should only act on the strongest syllables, a few dB now and then; if it works all the time, lower its input gain."
+    help:
+      g_in: "Gain into the limiter: more = louder but more limiting."
+      th: "Ceiling: the highest peak that leaves the chain (-1 dBFS)."
+      lk: "Look-ahead: it sees the peaks coming and lowers them cleanly (2-5 ms)."
+      rt: "How fast it lets go after a peak."
+      g_out: "Gain after the limiter: normally 0 dB (set the level to the radio with the Output trim)."
     # brickwall at -3 dBFS; 2 ms lookahead (low latency); no oversampling
     main: [g_in, th, lk, rt, g_out]
     params: { g_in: "0dB", th: "-3dB", boost: 0, alr: 0, mode: 0, lk: 2, at: 2, rt: 10, ovs: 0 }

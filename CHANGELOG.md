@@ -15,7 +15,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   threshold, hold and pre-roll) are shown and set like ordinary controls
   (mod-host `patch_set`).
 - Blocks can carry a short description (`info`) and per-control help
-  (`help`), shown in the block's panel; used for the RNNoise controls.
+  (`help`), shown in the block's panel: every factory block (`chain.yaml`) and
+  the Broadcast SSB blocks (high-pass, phase rotator, leveler, multiband
+  compressor, noise suppression) now explain what they do and how to set
+  their main controls.
 - **Test tone** (Chain tab, under the Output trim): 1 kHz or two-tone
   700 + 1900 Hz at the limiter's −1 dBFS peak, instead of the chain and before
   the Output trim, to set the level into the radio by its power/ALC meters and

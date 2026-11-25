@@ -77,6 +77,7 @@ class Factory:
                 "id": b["id"], "uri": b["uri"], "name": b.get("name"),
                 "replaces": b.get("replaces", ""), "main": b.get("main"),
                 "meters": b.get("meters"), "graph": b.get("graph"),
+                "info": b.get("info", ""), "help": dict(b.get("help") or {}),
                 "bypass": bool(b.get("bypass", False)),
                 "params": {s: parse_value(v) for s, v in (b.get("params") or {}).items()},
             }
@@ -280,7 +281,8 @@ def block_view(app, b):
     meters = resolve_meters(meta, spec["meters"] if spec and spec["meters"] is not None
                             else b.get("meters") if b.get("meters") is not None
                             else lv2meta.auto_meters(meta))
-    labels, helps = b.get("labels") or {}, b.get("help") or {}
+    labels = b.get("labels") or {}
+    helps = {**((spec and spec["help"]) or {}), **(b.get("help") or {})}
     controls = []
     for c in meta["controls"]:
         if c["symbol"] in labels or c["symbol"] in helps:
@@ -294,7 +296,7 @@ def block_view(app, b):
               "replaces": spec["replaces"] if spec else "", "plugin": meta["name"],
               "class": meta["class"], "graph": bool(graph), "main": main,
               "graph_unsupported": bool(meta["eq_like"] and not graph),
-              "controls": controls, "info": b.get("info", ""), "defaults": defaults_for(app, b), "meters": meters,
+              "controls": controls, "info": b.get("info") or (spec and spec["info"]) or "", "defaults": defaults_for(app, b), "meters": meters,
               "stereo": len(meta["audio_in"]) > 1})
     return v
 

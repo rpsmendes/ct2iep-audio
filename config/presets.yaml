@@ -77,7 +77,9 @@
 # ---------------------------------------------------------------------------
 x-broadcast:
   # building blocks of the "Broadcast SSB" presets below (YAML anchors)
-  hpf: &bc_hpf { id: hpf, name: High-pass, uri: "http://lsp-plug.in/plugins/lv2/filter_mono", main: [f, s] }
+  hpf: &bc_hpf { id: hpf, name: High-pass, uri: "http://lsp-plug.in/plugins/lv2/filter_mono", main: [f, s],
+    info: "Steep high-pass (48 dB/oct): removes rumble, desk thumps and the sub-bass part of plosives, which use transmitter power without being heard.",
+    help: { f: "Cut-off (45-70 Hz): higher = tighter, less deep.", s: "Slope: x4 = 48 dB/oct." } }
   # RNNoise noise suppression: off by default (switch it on with its power button to compare);
   # needs the image built with it (docker/Dockerfile), otherwise it says "plugin not installed"
   nr: &bc_nr { id: nr, name: Noise suppression, uri: "https://github.com/werman/noise-suppression-for-voice#mono", bypass: true,
@@ -89,6 +91,8 @@ x-broadcast:
       vad_grace_period: "Stays open this long after the voice stops, so word ends are not cut. Fans heard at the end of phrases: lower it (10-15). Default 20 = 200 ms.",
       vad_retroactive_grace_period: "Keeps this much audio from before the voice was detected, so word starts are kept (s, p). Adds the same delay: 3 = +30 ms. Default 0." } }
   phase: &bc_phase { id: phase, name: Phase rotator, uri: "http://gareus.org/oss/lv2/phaserotate", main: [angle],
+    info: "Phase rotator: a voice peaks higher on one side of the waveform; rotated, it is symmetric, so the same loudness has lower peaks (1.5-3 dB) and the limiter works less. Inaudible on its own.",
+    help: { angle: "Rotation: 120 is a good start; try 90-150 while watching the limiter's GR meter." },
     params: { angle: 120 } }
   # gate: closes 6 dB below the open threshold (ht is relative), -40 dB when closed, 5 ms
   # look-ahead so word onsets are not cut, detector high-passed at 200 Hz (ignores fan hum)
@@ -96,6 +100,8 @@ x-broadcast:
       sla: 5, scm: 1, scr: 20, shpm: 2, shpf: 200, slpm: 0 } }
   agc: &bc_agc { id: agc, name: Leveler (AGC), uri: "http://lsp-plug.in/plugins/lv2/compressor_mono",
     main: [al, cr, at, rt, mk], labels: { al: Threshold, cr: Ratio, at: Attack, rt: Release, mk: Makeup },
+    info: "Leveler (AGC): slowly rides the level like an operator, so the EQ and the compressors always get the same level, whether you lean in or back off. Its 5 ms look-ahead stops word starts from overshooting.",
+    help: { al: "From this level it lowers the voice. Its GR meter shows about 10-20 dB on normal speech.", cr: "How firmly it levels.", at: "How fast it lowers a louder passage.", rt: "How fast it raises the level again: slow = no pumping in the pauses.", mk: "Gain after it: brings the levelled voice to the working level of the next blocks." },
     meters: [{ symbol: rlm, label: AGC, kind: gr }],
     params: { scm: 1, scr: 30, sla: 5, al: "-42.0dB", cr: 3, kn: "-12.0dB",
         at: 10, rt: 1000, mk: "21.0dB" } }
@@ -105,6 +111,8 @@ x-broadcast:
       al_2: "Threshold 160-800 Hz", cr_2: "Ratio 160-800 Hz", mk_2: "Makeup 160-800 Hz",
       al_4: "Threshold 0.8-2.4 kHz", cr_4: "Ratio 0.8-2.4 kHz", mk_4: "Makeup 0.8-2.4 kHz",
       al_6: "Threshold >2.4 kHz", cr_6: "Ratio >2.4 kHz", mk_6: "Makeup >2.4 kHz" },
+    info: "4-band compressor: each band is held on its own, so the bass can be dense without pumping the voice. The makeups set the final tone: raise Makeup <160 Hz for more bass, lower Makeup 160-800 Hz against mud. The GR meter of each band should show a few dB on voice.",
+    help: {"al_0": "Where this band starts compressing.", "cr_0": "How firmly this band is held.", "mk_0": "Bass: up for deeper, down if it booms.", "al_2": "Where this band starts compressing.", "cr_2": "How firmly this band is held.", "mk_2": "Body and mud: down for a clearer voice.", "al_4": "Where this band starts compressing.", "cr_4": "How firmly this band is held.", "mk_4": "Core of the voice (intelligibility).", "al_6": "Where this band starts compressing.", "cr_6": "How firmly this band is held.", "mk_6": "Presence and s: up for brighter, down if it is harsh."},
     meters: [{ symbol: rlm_0, label: "<160", kind: gr }, { symbol: rlm_2, label: "160-800", kind: gr },
              { symbol: rlm_4, label: "0.8-2.4k", kind: gr }, { symbol: rlm_6, label: ">2.4k", kind: gr }] }
   mbc-deep: &bc_mbc_deep { mode: 1, envb: 0, cbe_1: 0, cbe_2: 1, sf_2: 160, cbe_3: 0,
