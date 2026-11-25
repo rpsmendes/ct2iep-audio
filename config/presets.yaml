@@ -21,6 +21,96 @@
 #    4.5 kHz in Europe (9 kHz channels), 5 kHz common in the US.
 #  - FreeDV, "Getting started": turn all audio processing off for digital voice.
 
+# ---------------------------------------------------------------------------
+# Broadcast SSB: full, deep voice with clean peaks, in 3 / 4 / 5 kHz versions.
+#
+# Signal path (each step has one job, so nothing is pushed into distortion):
+#   hpf     48 dB/oct high-pass at 45-70 Hz: removes rumble and the sub-bass
+#           part of plosives, which use power and ALC without being heard
+#   gate    soft expander (-12 dB) so the compression does not lift room noise
+#   phase   x42 Phaserotate 120 deg: voice is asymmetric (one polarity peaks
+#           several dB higher); rotated it is symmetric, measured -1.5 dB peak
+#           on the test voice, more on most real voices
+#   agc     leveler (3:1, soft knee, 5 ms look-ahead, 10 ms / 1 s): rides the
+#           level like an operator, so the rest of the chain always works at
+#           the same level; the look-ahead stops word onsets from overshooting
+#   eq      the tone: bass shelf, mud and boxiness cuts, presence, air
+#   bass    Calf Bass Enhancer: adds harmonics of the 60-120 Hz fundamentals,
+#           so the bass is still heard on receivers and speakers that do not
+#           reproduce it (Deep and Warm only, low amount)
+#   mbc     4-band compressor (160 / 800 / 2400 Hz): each band is controlled
+#           on its own, so the bass can be dense without pumping the voice and
+#           without eating the transmitter's peak power
+#   deesser sibilance control (more top end = more "s")
+#   lpf     steep low-pass at the bandwidth edge, before the limiter (a filter
+#           after the limiter would add overshoot)
+#   limiter look-ahead, 2x oversampled, ceiling -1 dBFS: catches only what is
+#           left, about 2 % of the time, at most ~8 dB on 10 ms word onsets
+#           (inaudible); it is not used to make the voice louder
+# Measured on a test voice (peak to loud-speech RMS): raw voice 17 dB, these
+# presets 12-14 dB, i.e. 3-5 dB more talk power at the same peak power, with
+# the 63-160 Hz band 2-5 dB up on the voice.
+# The level to the radio is then set with the Output trim (Chain tab), until
+# the radio's ALC barely moves on voice peaks. Radio: speech processor, TX EQ
+# and (Zeus) leveler / compressor / CFC OFF, so they do not stack.
+#
+# Bandwidth on the radios:
+#   FTDX-101D  3 kHz: SSB TX BPF 50-3050 Hz. 4 kHz: only with TTBF (hidden
+#              menu option, 50 Hz - 4 kHz). 5 kHz: not possible on this radio.
+#   Square SDR (Zeus): Settings > TX Filter, low 50 Hz, high 3000/4000/5000 Hz.
+# Use the wide versions only where the band has room for them.
+#
+# Mic (FDUCE SL40X, dynamic cardioid, 50 Hz - 14 kHz): the depth comes from
+# the proximity effect: speak at 3-5 cm, always at the same distance, slightly
+# off-axis, with a foam/pop filter. Further away = thinner voice.
+# ---------------------------------------------------------------------------
+x-broadcast:
+  # building blocks of the "Broadcast SSB" presets below (YAML anchors)
+  hpf: &bc_hpf { id: hpf, name: High-pass, uri: "http://lsp-plug.in/plugins/lv2/filter_mono", main: [f, s] }
+  phase: &bc_phase { id: phase, name: Phase rotator, uri: "http://gareus.org/oss/lv2/phaserotate", main: [angle],
+    params: { angle: 120 } }
+  gate: &bc_gate { id: gate, params: { gt: "-50dB", gr: "-12dB", at: 5, rt: 300, gh: 1, ht: "-56dB" } }
+  agc: &bc_agc { id: agc, name: Leveler (AGC), uri: "http://lsp-plug.in/plugins/lv2/compressor_mono",
+    main: [al, cr, at, rt, mk], labels: { al: Threshold, cr: Ratio, at: Attack, rt: Release, mk: Makeup },
+    meters: [{ symbol: rlm, label: AGC, kind: gr }],
+    params: { scm: 1, scr: 30, sla: 5, al: "-42.0dB", cr: 3, kn: "-12.0dB",
+        at: 10, rt: 1000, mk: "21.0dB" } }
+  mbc: &bc_mbc { id: mbc, name: Multiband compressor, uri: "http://lsp-plug.in/plugins/lv2/mb_compressor_mono",
+    main: [al_0, cr_0, mk_0, al_2, cr_2, mk_2, al_4, cr_4, mk_4, al_6, cr_6, mk_6],
+    labels: { al_0: "Threshold <160 Hz", cr_0: "Ratio <160 Hz", mk_0: "Makeup <160 Hz",
+      al_2: "Threshold 160-800 Hz", cr_2: "Ratio 160-800 Hz", mk_2: "Makeup 160-800 Hz",
+      al_4: "Threshold 0.8-2.4 kHz", cr_4: "Ratio 0.8-2.4 kHz", mk_4: "Makeup 0.8-2.4 kHz",
+      al_6: "Threshold >2.4 kHz", cr_6: "Ratio >2.4 kHz", mk_6: "Makeup >2.4 kHz" },
+    meters: [{ symbol: rlm_0, label: "<160", kind: gr }, { symbol: rlm_2, label: "160-800", kind: gr },
+             { symbol: rlm_4, label: "0.8-2.4k", kind: gr }, { symbol: rlm_6, label: ">2.4k", kind: gr }] }
+  mbc-deep: &bc_mbc_deep { mode: 1, envb: 0, cbe_1: 0, cbe_2: 1, sf_2: 160, cbe_3: 0,
+      cbe_4: 1, sf_4: 800, cbe_5: 0, cbe_6: 1, sf_6: 2400, cbe_7: 0,
+      g_in: "0.0dB", g_out: "0.0dB", al_0: "-24.0dB", cr_0: 3, at_0: 15, rt_0: 300,
+      mk_0: "9.9dB", kn_0: "-9.0dB", ce_0: 1, scm_0: 1, cm_0: 0, sla_0: 5,
+      al_2: "-27.0dB", cr_2: 2.5, at_2: 8, rt_2: 200, mk_2: "6.1dB", kn_2: "-9.0dB",
+      ce_2: 1, scm_2: 1, cm_2: 0, sla_2: 5, al_4: "-30.0dB", cr_4: 3,
+      at_4: 4, rt_4: 150, mk_4: "4.0dB", kn_4: "-9.0dB", ce_4: 1, scm_4: 1,
+      cm_4: 0, sla_4: 5, al_6: "-33.0dB", cr_6: 3, at_6: 2, rt_6: 100,
+      mk_6: "5.8dB", kn_6: "-9.0dB", ce_6: 1, scm_6: 1, cm_6: 0, sla_6: 5 }
+  mbc-punch: &bc_mbc_punch { mode: 1, envb: 0, cbe_1: 0, cbe_2: 1, sf_2: 160, cbe_3: 0,
+      cbe_4: 1, sf_4: 800, cbe_5: 0, cbe_6: 1, sf_6: 2400, cbe_7: 0,
+      g_in: "0.0dB", g_out: "0.0dB", al_0: "-26.0dB", cr_0: 4, at_0: 12, rt_0: 200,
+      mk_0: "12.2dB", kn_0: "-9.0dB", ce_0: 1, scm_0: 1, cm_0: 0, sla_0: 5,
+      al_2: "-29.0dB", cr_2: 3.5, at_2: 6, rt_2: 150, mk_2: "8.9dB", kn_2: "-9.0dB",
+      ce_2: 1, scm_2: 1, cm_2: 0, sla_2: 5, al_4: "-32.0dB", cr_4: 4,
+      at_4: 3, rt_4: 120, mk_4: "6.0dB", kn_4: "-9.0dB", ce_4: 1, scm_4: 1,
+      cm_4: 0, sla_4: 5, al_6: "-35.0dB", cr_6: 4, at_6: 2, rt_6: 80,
+      mk_6: "9.8dB", kn_6: "-9.0dB", ce_6: 1, scm_6: 1, cm_6: 0, sla_6: 5 }
+  mbc-warm: &bc_mbc_warm { mode: 1, envb: 0, cbe_1: 0, cbe_2: 1, sf_2: 160, cbe_3: 0,
+      cbe_4: 1, sf_4: 800, cbe_5: 0, cbe_6: 1, sf_6: 2400, cbe_7: 0,
+      g_in: "0.0dB", g_out: "0.0dB", al_0: "-22.0dB", cr_0: 2, at_0: 20, rt_0: 400,
+      mk_0: "7.4dB", kn_0: "-9.0dB", ce_0: 1, scm_0: 1, cm_0: 0, sla_0: 5,
+      al_2: "-25.0dB", cr_2: 2, at_2: 10, rt_2: 300, mk_2: "1.5dB", kn_2: "-9.0dB",
+      ce_2: 1, scm_2: 1, cm_2: 0, sla_2: 5, al_4: "-28.0dB", cr_4: 2,
+      at_4: 6, rt_4: 250, mk_4: "2.0dB", kn_4: "-9.0dB", ce_4: 1, scm_4: 1,
+      cm_4: 0, sla_4: 5, al_6: "-31.0dB", cr_6: 2, at_6: 3, rt_6: 150,
+      mk_6: "2.5dB", kn_6: "-9.0dB", ce_6: 1, scm_6: 1, cm_6: 0, sla_6: 5 }
+
 presets:
   - name: SSB DX / Contest
     mode: SSB
@@ -220,3 +310,265 @@ presets:
           ft_3: 0
       - id: limiter
         params: { th: "-6dB" }
+
+  - name: Broadcast Deep 3 kHz
+    group: Broadcast SSB
+    mode: SSB 3 kHz
+    radio: >-
+      FTDX-101D: SSB TX BPF 50-3050. Square SDR (Zeus): TX filter 50-3000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
+      set the level with the Output trim until the ALC barely moves.
+    description: >-
+      Deepest low end: a shelf at 90 Hz and low-frequency harmonics give a big, round voice, with the 280 Hz "mud" and 650 Hz "box" taken out so it stays clear. Medium multiband density. Audio 60 Hz - 3 kHz.
+    blocks:
+      - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 60 } }
+      - *bc_gate
+      - *bc_phase
+      - *bc_agc
+      - id: eq
+        params: { ft_0: 5, fm_0: 0, f_0: 90, s_0: 0, ft_1: 1, f_1: 280,
+            g_1: "-3.5dB", q_1: 1.2, ft_2: 1, f_2: 650, g_2: "-2.0dB", q_2: 1.5,
+            ft_3: 1, f_3: 2400, g_3: "2.0dB", mode: 0, g_0: "7.0dB", q_0: 0,
+            fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
+            q_3: 0.8, ft_4: 0 }
+      - id: bass
+        params: { amount: 1, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+      - { <<: *bc_mbc, params: *bc_mbc_deep }
+      - id: deesser
+        params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3000, mode: 1 }
+      - id: lpf
+        params: { f: 2950 }
+      - id: limiter
+        params: { th: "-1.0dB", lk: 5, ovs: 12 }
+
+  - name: Broadcast Deep 4 kHz
+    group: Broadcast SSB
+    mode: SSB 4 kHz
+    radio: >-
+      FTDX-101D: only with TTBF (hidden option, 50 Hz - 4 kHz). Square SDR (Zeus): TX filter 50-4000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
+      set the level with the Output trim until the ALC barely moves.
+    description: >-
+      Deepest low end: a shelf at 90 Hz and low-frequency harmonics give a big, round voice, with the 280 Hz "mud" and 650 Hz "box" taken out so it stays clear. Medium multiband density. Audio 50 Hz - 4 kHz.
+    blocks:
+      - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 50 } }
+      - *bc_gate
+      - *bc_phase
+      - *bc_agc
+      - id: eq
+        params: { ft_0: 5, fm_0: 0, f_0: 90, s_0: 0, ft_1: 1, f_1: 280,
+            g_1: "-3.5dB", q_1: 1.2, ft_2: 1, f_2: 650, g_2: "-2.0dB", q_2: 1.5,
+            ft_3: 1, f_3: 2800, g_3: "2.0dB", mode: 0, g_0: "7.0dB", q_0: 0,
+            fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
+            q_3: 0.8, ft_4: 3, fm_4: 0, s_4: 0, f_4: 3400, g_4: "1.5dB",
+            q_4: 0 }
+      - id: bass
+        params: { amount: 1, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+      - { <<: *bc_mbc, params: *bc_mbc_deep }
+      - id: deesser
+        params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3800, mode: 1 }
+      - id: lpf
+        params: { f: 3900 }
+      - id: limiter
+        params: { th: "-1.0dB", lk: 5, ovs: 12 }
+
+  - name: Broadcast Deep 5 kHz
+    group: Broadcast SSB
+    mode: SSB 5 kHz
+    radio: >-
+      Square SDR (Zeus): TX filter 50-5000 Hz. Not possible on the FTDX-101D. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
+      set the level with the Output trim until the ALC barely moves.
+    description: >-
+      Deepest low end: a shelf at 90 Hz and low-frequency harmonics give a big, round voice, with the 280 Hz "mud" and 650 Hz "box" taken out so it stays clear. Medium multiband density. Audio 45 Hz - 5 kHz.
+    blocks:
+      - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 45 } }
+      - *bc_gate
+      - *bc_phase
+      - *bc_agc
+      - id: eq
+        params: { ft_0: 5, fm_0: 0, f_0: 90, s_0: 0, ft_1: 1, f_1: 280,
+            g_1: "-3.5dB", q_1: 1.2, ft_2: 1, f_2: 650, g_2: "-2.0dB", q_2: 1.5,
+            ft_3: 1, f_3: 3200, g_3: "2.0dB", mode: 0, g_0: "7.0dB", q_0: 0,
+            fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
+            q_3: 0.8, ft_4: 3, fm_4: 0, s_4: 0, f_4: 4200, g_4: "1.5dB",
+            q_4: 0 }
+      - id: bass
+        params: { amount: 1, drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+      - { <<: *bc_mbc, params: *bc_mbc_deep }
+      - id: deesser
+        params: { threshold: "-26.0dB", ratio: 4, f1_freq: 4500, mode: 1 }
+      - id: lpf
+        params: { f: 4850 }
+      - id: limiter
+        params: { th: "-1.0dB", lk: 5, ovs: 12 }
+
+  - name: Broadcast Punch 3 kHz
+    group: Broadcast SSB
+    mode: SSB 3 kHz
+    radio: >-
+      FTDX-101D: SSB TX BPF 50-3050. Square SDR (Zeus): TX filter 50-3000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
+      set the level with the Output trim until the ALC barely moves.
+    description: >-
+      Tight, firm low end at 140 Hz (high-pass a little higher, no sub-bass), forward presence and the densest compression: full-bodied but cuts through noise and QRM. Audio 80 Hz - 3 kHz.
+    blocks:
+      - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 80 } }
+      - *bc_gate
+      - *bc_phase
+      - *bc_agc
+      - id: eq
+        params: { ft_0: 1, fm_0: 0, f_0: 140, s_0: 0, ft_1: 1, f_1: 380,
+            g_1: "-3.0dB", q_1: 1.2, ft_2: 1, f_2: 900, g_2: "-1.0dB", q_2: 1.5,
+            ft_3: 1, f_3: 2400, g_3: "4.0dB", mode: 0, g_0: "5.0dB", q_0: 1,
+            fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
+            q_3: 0.9, ft_4: 0 }
+      - { <<: *bc_mbc, params: *bc_mbc_punch }
+      - id: deesser
+        params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3000, mode: 1 }
+      - id: lpf
+        params: { f: 2950 }
+      - id: limiter
+        params: { g_in: "-2.0dB", th: "-1.0dB", lk: 5, ovs: 12 }
+
+  - name: Broadcast Punch 4 kHz
+    group: Broadcast SSB
+    mode: SSB 4 kHz
+    radio: >-
+      FTDX-101D: only with TTBF (hidden option, 50 Hz - 4 kHz). Square SDR (Zeus): TX filter 50-4000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
+      set the level with the Output trim until the ALC barely moves.
+    description: >-
+      Tight, firm low end at 140 Hz (high-pass a little higher, no sub-bass), forward presence and the densest compression: full-bodied but cuts through noise and QRM. Audio 70 Hz - 4 kHz.
+    blocks:
+      - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 70 } }
+      - *bc_gate
+      - *bc_phase
+      - *bc_agc
+      - id: eq
+        params: { ft_0: 1, fm_0: 0, f_0: 140, s_0: 0, ft_1: 1, f_1: 380,
+            g_1: "-3.0dB", q_1: 1.2, ft_2: 1, f_2: 900, g_2: "-1.0dB", q_2: 1.5,
+            ft_3: 1, f_3: 2800, g_3: "4.0dB", mode: 0, g_0: "5.0dB", q_0: 1,
+            fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
+            q_3: 0.9, ft_4: 3, fm_4: 0, s_4: 0, f_4: 3400, g_4: "1.0dB",
+            q_4: 0 }
+      - { <<: *bc_mbc, params: *bc_mbc_punch }
+      - id: deesser
+        params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3800, mode: 1 }
+      - id: lpf
+        params: { f: 3900 }
+      - id: limiter
+        params: { g_in: "-2.0dB", th: "-1.0dB", lk: 5, ovs: 12 }
+
+  - name: Broadcast Punch 5 kHz
+    group: Broadcast SSB
+    mode: SSB 5 kHz
+    radio: >-
+      Square SDR (Zeus): TX filter 50-5000 Hz. Not possible on the FTDX-101D. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
+      set the level with the Output trim until the ALC barely moves.
+    description: >-
+      Tight, firm low end at 140 Hz (high-pass a little higher, no sub-bass), forward presence and the densest compression: full-bodied but cuts through noise and QRM. Audio 65 Hz - 5 kHz.
+    blocks:
+      - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 65 } }
+      - *bc_gate
+      - *bc_phase
+      - *bc_agc
+      - id: eq
+        params: { ft_0: 1, fm_0: 0, f_0: 140, s_0: 0, ft_1: 1, f_1: 380,
+            g_1: "-3.0dB", q_1: 1.2, ft_2: 1, f_2: 900, g_2: "-1.0dB", q_2: 1.5,
+            ft_3: 1, f_3: 3200, g_3: "4.0dB", mode: 0, g_0: "5.0dB", q_0: 1,
+            fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
+            q_3: 0.9, ft_4: 3, fm_4: 0, s_4: 0, f_4: 4200, g_4: "1.0dB",
+            q_4: 0 }
+      - { <<: *bc_mbc, params: *bc_mbc_punch }
+      - id: deesser
+        params: { threshold: "-26.0dB", ratio: 4, f1_freq: 4500, mode: 1 }
+      - id: lpf
+        params: { f: 4850 }
+      - id: limiter
+        params: { g_in: "-2.0dB", th: "-1.0dB", lk: 5, ovs: 12 }
+
+  - name: Broadcast Warm 3 kHz
+    group: Broadcast SSB
+    mode: SSB 3 kHz
+    radio: >-
+      FTDX-101D: SSB TX BPF 50-3050. Square SDR (Zeus): TX filter 50-3000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
+      set the level with the Output trim until the ALC barely moves.
+    description: >-
+      Smooth studio voice: warmth at 150-220 Hz, gentle 2:1 compression in every band, little presence. The most natural of the three. Audio 60 Hz - 3 kHz.
+    blocks:
+      - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 60 } }
+      - *bc_gate
+      - *bc_phase
+      - *bc_agc
+      - id: eq
+        params: { ft_0: 5, fm_0: 0, f_0: 160, s_0: 0, ft_1: 1, f_1: 220,
+            g_1: "1.5dB", q_1: 1, ft_2: 1, f_2: 500, g_2: "-2.0dB", q_2: 1.2,
+            ft_3: 1, f_3: 2400, g_3: "1.0dB", mode: 0, g_0: "4.5dB", q_0: 0,
+            fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
+            q_3: 0.7, ft_4: 0 }
+      - id: bass
+        params: { drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+      - { <<: *bc_mbc, params: *bc_mbc_warm }
+      - id: deesser
+        params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3000, mode: 1 }
+      - id: lpf
+        params: { f: 2950 }
+      - id: limiter
+        params: { th: "-1.0dB", lk: 5, ovs: 12 }
+
+  - name: Broadcast Warm 4 kHz
+    group: Broadcast SSB
+    mode: SSB 4 kHz
+    radio: >-
+      FTDX-101D: only with TTBF (hidden option, 50 Hz - 4 kHz). Square SDR (Zeus): TX filter 50-4000 Hz. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
+      set the level with the Output trim until the ALC barely moves.
+    description: >-
+      Smooth studio voice: warmth at 150-220 Hz, gentle 2:1 compression in every band, little presence. The most natural of the three. Audio 50 Hz - 4 kHz.
+    blocks:
+      - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 50 } }
+      - *bc_gate
+      - *bc_phase
+      - *bc_agc
+      - id: eq
+        params: { ft_0: 5, fm_0: 0, f_0: 160, s_0: 0, ft_1: 1, f_1: 220,
+            g_1: "1.5dB", q_1: 1, ft_2: 1, f_2: 500, g_2: "-2.0dB", q_2: 1.2,
+            ft_3: 1, f_3: 2800, g_3: "1.0dB", mode: 0, g_0: "4.5dB", q_0: 0,
+            fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
+            q_3: 0.7, ft_4: 3, fm_4: 0, s_4: 0, f_4: 3400, g_4: "0.5dB",
+            q_4: 0 }
+      - id: bass
+        params: { drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+      - { <<: *bc_mbc, params: *bc_mbc_warm }
+      - id: deesser
+        params: { threshold: "-26.0dB", ratio: 4, f1_freq: 3800, mode: 1 }
+      - id: lpf
+        params: { f: 3900 }
+      - id: limiter
+        params: { th: "-1.0dB", lk: 5, ovs: 12 }
+
+  - name: Broadcast Warm 5 kHz
+    group: Broadcast SSB
+    mode: SSB 5 kHz
+    radio: >-
+      Square SDR (Zeus): TX filter 50-5000 Hz. Not possible on the FTDX-101D. Speech processor, TX EQ and (Zeus) leveler / compressor / CFC off;
+      set the level with the Output trim until the ALC barely moves.
+    description: >-
+      Smooth studio voice: warmth at 150-220 Hz, gentle 2:1 compression in every band, little presence. The most natural of the three. Audio 45 Hz - 5 kHz.
+    blocks:
+      - { <<: *bc_hpf, params: { ft: 1, fm: 2, s: 3, mode: 0, f: 45 } }
+      - *bc_gate
+      - *bc_phase
+      - *bc_agc
+      - id: eq
+        params: { ft_0: 5, fm_0: 0, f_0: 160, s_0: 0, ft_1: 1, f_1: 220,
+            g_1: "1.5dB", q_1: 1, ft_2: 1, f_2: 500, g_2: "-2.0dB", q_2: 1.2,
+            ft_3: 1, f_3: 3200, g_3: "1.0dB", mode: 0, g_0: "4.5dB", q_0: 0,
+            fm_1: 0, s_1: 0, fm_2: 0, s_2: 0, fm_3: 0, s_3: 0,
+            q_3: 0.7, ft_4: 3, fm_4: 0, s_4: 0, f_4: 4200, g_4: "0.5dB",
+            q_4: 0 }
+      - id: bass
+        params: { drive: 5, freq: 120, floor_active: 1, floor: 40, blend: 0 }
+      - { <<: *bc_mbc, params: *bc_mbc_warm }
+      - id: deesser
+        params: { threshold: "-26.0dB", ratio: 4, f1_freq: 4500, mode: 1 }
+      - id: lpf
+        params: { f: 4850 }
+      - id: limiter
+        params: { th: "-1.0dB", lk: 5, ovs: 12 }
+

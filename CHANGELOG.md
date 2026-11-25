@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Broadcast SSB** built-in presets (own group in the preset list): Deep,
+  Punch and Warm, each in 3, 4 and 5 kHz versions, for the FTDX-101D and the
+  Square SDR (Zeus). Steep high-pass, phase rotator, look-ahead leveler, EQ,
+  bass enhancer, 4-band compressor, de-esser, steep low-pass and a look-ahead
+  limiter at −1 dBFS: deep, dense bass without clipping. Radio settings and mic
+  technique in the README and `config/presets.yaml`.
 - Built-in presets can have a `group` (shown as a separate group in the preset
   list), and blocks that are not in `chain.yaml` can set their main controls,
   control `labels` and meters. Blocks with several gain-reduction meters show
