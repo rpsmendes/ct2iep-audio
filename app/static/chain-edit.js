@@ -17,32 +17,36 @@ function startDrag(e, blk, strip) {
   const grip = e.currentTarget;
   grip.setPointerCapture(e.pointerId);
   const others = [...strip.querySelectorAll(".blk")].filter(b => b !== blk);
-  const startX = e.clientX, startScroll = strip.scrollLeft;
-  let target = null, timer = null, lastX = e.clientX;
+  const startX = e.clientX, startY = e.clientY, startScroll = window.scrollY;
+  let target = null, timer = null, lastX = e.clientX, lastY = e.clientY;
   blk.classList.add("dragging");
   UI.busy = (UI.busy || 0) + 1;
 
-  const mark = x => {
+  // the blocks wrap in rows (signal order = reading order): insert before the
+  // first block that is on a lower row, or on the same row and right of the pointer
+  const mark = (x, y) => {
     others.forEach(b => b.classList.remove("ins-before", "ins-after"));
-    let idx = others.findIndex(b => { const r = b.getBoundingClientRect(); return x < r.left + r.width / 2; });
+    let idx = others.findIndex(b => {
+      const r = b.getBoundingClientRect();
+      return y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
+    });
     if (idx < 0) idx = others.length;
     if (idx < others.length) others[idx].classList.add("ins-before");
     else if (others.length) others[others.length - 1].classList.add("ins-after");
     target = idx;
   };
   const place = () => {
-    blk.style.transform = `translateX(${lastX - startX + (strip.scrollLeft - startScroll)}px)`;
-    mark(lastX);
+    blk.style.transform = `translate(${lastX - startX}px, ${lastY - startY + (window.scrollY - startScroll)}px)`;
+    mark(lastX, lastY);
   };
-  // scroll the strip while dragging near its edges
+  // scroll the page while dragging near the top/bottom of the window
   const autoscroll = () => {
-    const r = strip.getBoundingClientRect();
-    const v = lastX < r.left + 48 ? -14 : lastX > r.right - 48 ? 14 : 0;
-    if (v) { strip.scrollLeft += v; place(); }
+    const v = lastY < 60 ? -14 : lastY > window.innerHeight - 60 ? 14 : 0;
+    if (v) { window.scrollBy(0, v); place(); }
   };
   timer = setInterval(autoscroll, 30);
 
-  const move = ev => { lastX = ev.clientX; place(); };
+  const move = ev => { lastX = ev.clientX; lastY = ev.clientY; place(); };
   const end = () => {
     clearInterval(timer);
     grip.removeEventListener("pointermove", move);

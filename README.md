@@ -169,10 +169,14 @@ ct2iep-station, port 7080).
   The chain is mono and goes to both channels of each output. If the radio adds
   both channels of its USB input, **Left channel only** lowers the level by
   about 6 dB.
-- **Block strip** (like in Waveform): click a block to see its parameters; the
-  ⏻ button switches that block on/off. A switched-off block is unloaded from
-  the engine and the signal goes around it, so it uses no CPU.
-- **Change the order**: drag a block by its **⋮⋮** handle to another position,
+- **Blocks**: a grid that wraps (no horizontal scrolling; two columns on a
+  phone). The number on each block is its place in the signal path. Each block
+  shows its own meters (gain reduction **GR**, input/output level). Click a
+  block to see its parameters (on a phone the page scrolls to them); the ⏻
+  button switches that block on/off. A switched-off block is unloaded from the
+  engine and the signal goes around it, so it uses no CPU.
+- **Change the order**: drag a block by its **⋮⋮** handle to another position
+  (also to another row),
   or use **◀ ▶** in the block panel. Only the JACK connections that change are
   redone (a few milliseconds of silence).
 - **Add / remove**: **+** at the end of the strip opens the library of all

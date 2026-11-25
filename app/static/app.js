@@ -203,31 +203,38 @@ function applyChain(v) {
   UI.chain = v;
   if (!UI.selected || !blockById(UI.selected)) UI.selected = v.blocks[0]?.id || null;
   setStatus(v.online, v.online ? "engine running" : "audio engine stopped");
-  renderMeters(); renderStrip(); renderPanel();
+  renderStrip(); renderPanel();
   UI.hooks.chain.forEach(f => f(v));
 }
 async function loadChain() {
   applyChain(await api("GET", "/api/chain"));
   loadPresets();
 }
-function select(id) { UI.selected = id; renderStrip(); renderPanel(); }
+function select(id, fromTap) {
+  UI.selected = id; renderStrip(); renderPanel();
+  // phone: the panel is below the grid, bring it into view
+  if (fromTap && window.matchMedia("(max-width: 700px)").matches)
+    $("#panel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 function renderStrip() {
   const s = $("#strip"); s.innerHTML = "";
   $("#abBtn").classList.toggle("on", !!UI.chain.chain_bypass);
   chainSummary();
-  for (const b of UI.chain.blocks) {
+  UI.chain.blocks.forEach((b, i) => {
     const off = b.bypass || UI.chain.chain_bypass;
     const d = el("div", "blk" + (b.id === UI.selected ? " sel" : "") + (off ? " off" : "") + (b.error || b.missing ? " bad" : ""));
     d.dataset.id = b.id;
-    d.append(el("div", "n", b.name), el("div", "r", b.missing ? "plugin not installed" : b.error ? "failed to load" : (b.replaces || b.plugin)));
+    const n = el("div", "n"); n.append(el("span", "num", String(i + 1)), document.createTextNode(b.name));
+    d.append(n, el("div", "r", b.missing ? "plugin not installed" : b.error ? "failed to load" : (b.replaces || b.plugin)));
     const pw = el("button", "pw", "⏻"); pw.title = b.bypass ? "Switch on" : "Bypass"; pw.setAttribute("aria-label", pw.title);
     pw.onclick = e => { e.stopPropagation(); setBypass(b, !b.bypass); };
     d.append(pw);
-    d.onclick = () => select(b.id);
+    d.onclick = () => select(b.id, true);
     s.append(d);
-  }
+  });
   UI.hooks.stripTail.forEach(f => f(s));
+  renderMeters();
 }
 function setBypass(b, val) {
   b.bypass = val; send({ type: "bypass", block: b.id, value: val });
@@ -328,16 +335,24 @@ function sendThrottled(block, symbol, value) {
 
 // ---------- meters ----------
 const meterEls = {};
+// each block's meters live inside its tile in the grid
 function renderMeters() {
-  const m = $("#meters"); m.innerHTML = ""; for (const k in meterEls) delete meterEls[k];
-  for (const b of UI.chain.blocks) for (const mt of b.meters) {
-    const key = `${b.id}.${mt.symbol}`;
+  for (const k in meterEls) delete meterEls[k];
+  for (const b of UI.chain.blocks) {
+    const tile = document.querySelector(`#strip .blk[data-id="${CSS.escape(b.id)}"]`);
+    if (!tile || !b.meters.length) continue;
+    tile.querySelector(".bms")?.remove();
+    const box = el("div", "bms");
     const off = b.bypass || UI.chain.chain_bypass;     // unloaded: no readings
-    const d = el("div", "meter" + (mt.kind === "gr" ? " gr" : "") + (off ? " off" : ""));
-    const top = el("div", "top"); const v = el("span", "val", "—");
-    top.append(el("span", null, mt.label), v);
-    const bar = el("div", "bar"); const f = el("div", "fill"); bar.append(f); d.append(top, bar); m.append(d);
-    meterEls[key] = { mt, v, f };
+    for (const mt of b.meters) {
+      const d = el("div", "meter" + (mt.kind === "gr" ? " gr" : "") + (off ? " off" : ""));
+      d.title = mt.kind === "gr" ? `${mt.label}: gain reduction` : `${mt.label}: level`;
+      const top = el("div", "top"); const v = el("span", "val", "—");
+      top.append(el("span", null, mt.kind === "gr" ? "GR" : mt.label), v);
+      const bar = el("div", "bar"); const f = el("div", "fill"); bar.append(f); d.append(top, bar); box.append(d);
+      meterEls[`${b.id}.${mt.symbol}`] = { mt, v, f };
+    }
+    tile.append(box);
   }
 }
 function updateMeters(values) {
