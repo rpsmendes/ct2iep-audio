@@ -441,6 +441,18 @@ def trim_params(stage, lv):
 # ----------------------------------------------------------------------------
 # Engine (mod-host)
 # ----------------------------------------------------------------------------
+def set_cmd(b, i, sym, v):
+    """mod-host command for one parameter: param_set for control ports,
+    patch_set for patch parameters (property URI in the control's "patch")."""
+    try:
+        c = next((c for c in lv2meta.describe(b["uri"])["controls"] if c["symbol"] == sym), None)
+    except KeyError:
+        c = None
+    if c and c.get("patch"):
+        return f'patch_set {i} "{c["patch"]}" {v:.6g}'
+    return f"param_set {i} {sym} {v:.6g}"
+
+
 class Engine:
     def __init__(self, app):
         self.app = app
@@ -489,7 +501,7 @@ class Engine:
             return False
         self.inst[b["id"]] = i
         for s, v in b["params"].items():
-            await self.cmd(f"param_set {i} {s} {v:.6g}", quiet=True)
+            await self.cmd(set_cmd(b, i, s, v), quiet=True)
         meta = lv2meta.describe(b["uri"])
         for m in block_view(self.app, b)["meters"]:
             if m["symbol"] in meta["outputs"]:
@@ -724,7 +736,7 @@ async def op_param(app, bid, sym, value, origin=None):
     eng: Engine = app["engine"]
     i = eng.inst.get(bid)
     if eng.online and i is not None:
-        await eng.cmd(f"param_set {i} {sym} {v:.6g}")
+        await eng.cmd(set_cmd(b, i, sym, v))
     schedule_save(app)
     await broadcast(app, {"type": "param", "block": bid, "symbol": sym, "value": v}, exclude=origin)
 
@@ -852,7 +864,7 @@ async def op_apply_state(app, new_state):
                 i = eng.inst.get(b["id"])
                 if i is not None:
                     for s, v in b["params"].items():
-                        await eng.cmd(f"param_set {i} {s} {v:.6g}", quiet=True)
+                        await eng.cmd(set_cmd(b, i, s, v), quiet=True)
             await eng.sync()
     await chain_changed(app)
 

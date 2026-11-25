@@ -275,7 +275,11 @@ ct2iep-station, port 7080).
   spectrum; it adds about 30 ms of latency and a few % of one CPU core. Its own
   voice detection mutes the pauses, so with it on the gate has little left to
   do. Listen for artefacts (a "watery" voice, cut word ends) on a second
-  receiver: if you hear them, leave it off and rely on the gate. The first
+  receiver: if you hear them, leave it off and rely on the gate. Its controls:
+  *Voice detection threshold* (0–1, default 0.6: higher mutes more, also weak
+  word ends), *Hold after the voice* (×10 ms, default 200 ms before muting)
+  and *Keep before the voice* (×10 ms, default 0: higher keeps word starts but
+  adds the same delay). The first
   image build takes a few minutes longer (it compiles the plugin); if that
   build fails the image is built without it and the block says "plugin not
   installed".

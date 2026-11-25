@@ -137,6 +137,10 @@ def reload():
             "notonui": w.new_uri("http://lv2plug.in/ns/ext/port-props#notOnGUI"),
             "patch_writable": w.new_uri("http://lv2plug.in/ns/ext/patch#writable"),
             "rdfs_range": w.new_uri("http://www.w3.org/2000/01/rdf-schema#range"),
+            "rdfs_label": w.new_uri("http://www.w3.org/2000/01/rdf-schema#label"),
+            "minimum": w.new_uri("http://lv2plug.in/ns/lv2core#minimum"),
+            "maximum": w.new_uri("http://lv2plug.in/ns/lv2core#maximum"),
+            "default": w.new_uri("http://lv2plug.in/ns/lv2core#default"),
         }
         _world = w
         _desc_cache.clear()
@@ -228,9 +232,38 @@ def describe(uri: str) -> dict:
                     d["controls"].append(info)
             else:
                 d["outputs"][sym] = info
+        d["controls"] += _patch_controls(plugin, {c["symbol"] for c in d["controls"]})
         d["graph"] = d["eq_like"] and d["measurable"]
         _desc_cache[uri] = d
         return d
+
+
+_NUMERIC = {"http://lv2plug.in/ns/ext/atom#" + t: t for t in ("Float", "Double", "Int", "Long", "Bool")}
+
+
+def _patch_controls(plugin, taken):
+    """Numeric patch:writable parameters (LV2 "parameters" set through atom
+    messages, e.g. RNNoise's VAD threshold) as ordinary controls. "patch" holds
+    the property URI: the engine sets them with mod-host's patch_set."""
+    out = []
+    for prop in _world.find_nodes(plugin.get_uri(), _N["patch_writable"], None):
+        rng = _world.get(prop, _N["rdfs_range"], None)
+        kind = _NUMERIC.get(str(rng)) if rng is not None else None
+        if not kind:
+            continue
+        uri = str(prop)
+        sym = re.sub(r"\W", "_", re.split(r"[#/:]", uri)[-1]) or "param"
+        while sym in taken:
+            sym += "_"
+        taken.add(sym)
+        label = _world.get(prop, _N["rdfs_label"], None)
+        mn = _f(_world.get(prop, _N["minimum"], None))
+        mx = _f(_world.get(prop, _N["maximum"], None), 1.0)
+        out.append({"symbol": sym, "name": str(label) if label is not None else sym,
+                    "min": mn, "max": mx, "default": _f(_world.get(prop, _N["default"], None), mn),
+                    "unit": "", "log": False, "toggle": kind == "Bool",
+                    "integer": kind in ("Int", "Long"), "enum": False, "points": [], "patch": uri})
+    return out
 
 
 def auto_meters(meta: dict) -> list:

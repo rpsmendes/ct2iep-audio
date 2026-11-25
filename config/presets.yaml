@@ -80,7 +80,10 @@ x-broadcast:
   hpf: &bc_hpf { id: hpf, name: High-pass, uri: "http://lsp-plug.in/plugins/lv2/filter_mono", main: [f, s] }
   # RNNoise noise suppression: off by default (switch it on with its power button to compare);
   # needs the image built with it (docker/Dockerfile), otherwise it says "plugin not installed"
-  nr: &bc_nr { id: nr, name: Noise suppression, uri: "https://github.com/werman/noise-suppression-for-voice#mono", bypass: true }
+  nr: &bc_nr { id: nr, name: Noise suppression, uri: "https://github.com/werman/noise-suppression-for-voice#mono", bypass: true,
+    main: [vad_threshold, vad_grace_period, vad_retroactive_grace_period],
+    labels: { vad_threshold: Voice detection threshold, vad_grace_period: "Hold after the voice (x 10 ms)",
+      vad_retroactive_grace_period: "Keep before the voice (x 10 ms)" } }
   phase: &bc_phase { id: phase, name: Phase rotator, uri: "http://gareus.org/oss/lv2/phaserotate", main: [angle],
     params: { angle: 120 } }
   # gate: closes 6 dB below the open threshold (ht is relative), -40 dB when closed, 5 ms
