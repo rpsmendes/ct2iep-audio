@@ -38,6 +38,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   filters (in the image / installed from the UI) and pages of 20/50/100.
 
 ### Changed
+- **Same look as the other ct2iep-* apps** (ct2iep-amp, ct2iep-station): same
+  header (brand, state chips, *Keep screen on* and *Full screen* buttons, tabs
+  after a divider; icons only on phones), same colour tokens, every area in a
+  card with a title line (dot, name, summary) and tiles inside, same toast
+  (green, red for errors) and a footer line. Header chips: **ENGINE ON / OFF /
+  NO LINK**, **BYPASS** while A/B is on, **CLIP** (blinking) while the card input
+  or the output to the radio clips.
 - **Compose services renamed** `engine` → `audio-engine` and `web` →
   `audio-web` (same as the container names), so this file can be included in a
   central compose file with other stacks. Commands such as

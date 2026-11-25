@@ -8,7 +8,7 @@ async function sendOrder(ids) {
   UI.chain.blocks = ids.map(i => map[i]);
   renderStrip(); renderMeters();
   try { await api("POST", "/api/chain/order", { order: ids }); }
-  catch (e) { toast("Could not change the order: " + e.message); loadChain(); }
+  catch (e) { toast("Could not change the order: " + e.message, 4000, true); loadChain(); }
 }
 
 function startDrag(e, blk, strip) {
@@ -90,7 +90,7 @@ UI.hooks.panelActions.push((b, actions) => {
     const next = UI.chain.blocks[i + 1]?.id || UI.chain.blocks[i - 1]?.id || null;
     UI.selected = next;              // the server's "chain" message then arrives with this one selected
     try { await api("DELETE", `/api/chain/blocks/${encodeURIComponent(b.id)}`); toast(`"${b.name}" removed`); }
-    catch (e) { UI.selected = b.id; toast(e.message); }
+    catch (e) { UI.selected = b.id; toast(e.message, 4000, true); }
   };
   actions.append(mv(-1, "◀", "Move earlier in the chain"), mv(1, "▶", "Move later in the chain"), rm);
 });

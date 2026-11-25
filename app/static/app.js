@@ -14,8 +14,8 @@ const $ = (s, el = document) => el.querySelector(s);
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const blockById = id => UI.chain?.blocks.find(b => b.id === id);
 
-function toast(msg, ms = 2500) {
-  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+function toast(msg, ms = 2500, bad = false) {
+  const t = $("#toast"); t.textContent = msg; t.hidden = false; t.classList.toggle("bad", !!bad);
   clearTimeout(t._h); t._h = setTimeout(() => (t.hidden = true), ms);
 }
 async function api(method, url, body) {
@@ -181,10 +181,22 @@ function handle(m) {
     case "chain_bypass": UI.chain.chain_bypass = m.value; renderStrip(); UI.hooks.param.forEach(f => f(null)); break;
     case "meters": updateMeters(m.values); UI.hooks.meters.forEach(f => f(m.values)); break;
     case "levels": UI.hooks.levels.forEach(f => f(m.levels)); break;
-    case "error": toast("Error: " + m.message); break;
+    case "error": toast("Error: " + m.message, 4000, true); break;
   }
 }
-function setStatus(on, text) { $("#dot").classList.toggle("on", !!on); $("#statusText").textContent = text; }
+// engine state: dot + text in the chain card, chip in the header (like the other ct2iep-* apps)
+function setStatus(on, text) {
+  $("#dot").classList.toggle("on", !!on); $("#statusText").textContent = text;
+  const c = $("#engineChip");
+  c.textContent = on ? "ENGINE ON" : ws && ws.readyState === 1 ? "ENGINE OFF" : "NO LINK";
+  c.className = "chip state " + (on ? "ok" : "bad"); c.title = "Audio engine: " + text;
+}
+function chainSummary() {
+  if (!UI.chain) return;
+  const n = UI.chain.blocks.length, on = UI.chain.blocks.filter(b => !b.bypass).length;
+  $("#chainSub").textContent = UI.chain.chain_bypass ? `A/B: all ${n} blocks out of the path` : `${on} of ${n} blocks on`;
+  $("#abChip").hidden = !UI.chain.chain_bypass;
+}
 
 // ---------- chain ----------
 function applyChain(v) {
@@ -203,6 +215,7 @@ function select(id) { UI.selected = id; renderStrip(); renderPanel(); }
 function renderStrip() {
   const s = $("#strip"); s.innerHTML = "";
   $("#abBtn").classList.toggle("on", !!UI.chain.chain_bypass);
+  chainSummary();
   for (const b of UI.chain.blocks) {
     const off = b.bypass || UI.chain.chain_bypass;
     const d = el("div", "blk" + (b.id === UI.selected ? " sel" : "") + (off ? " off" : "") + (b.error || b.missing ? " bad" : ""));
@@ -379,14 +392,14 @@ $("#presetLoad").onclick = async () => {
   const url = builtin ? `/api/presets/builtin/${encodeURIComponent(name)}/load` : `/api/presets/${encodeURIComponent(name)}/load`;
   const label = builtin ? PRESETS.builtin.find(p => p.slug === name)?.name : name;
   try { await api("POST", url); toast(`Preset "${label}" loaded`); }
-  catch (e) { toast(e.message); }
+  catch (e) { toast(e.message, 4000, true); }
 };
 $("#presetSave").onclick = async () => {
   const v = $("#presetSel").value;
   const suggest = v.startsWith("u:") ? v.slice(2) : v.startsWith("b:") ? (PRESETS.builtin.find(p => "b:" + p.slug === v)?.name || "") + " mine" : "";
   const n = prompt("Preset name (e.g. SSB DX, SSB ragchew):", suggest); if (!n) return;
   try { await api("POST", "/api/presets", { name: n }); await loadPresets(); $("#presetSel").value = "u:" + n; presetInfo(); toast(`Saved "${n}" (order, blocks and values)`); }
-  catch (e) { toast(e.message); }
+  catch (e) { toast(e.message, 4000, true); }
 };
 $("#presetDel").onclick = async () => {
   const v = $("#presetSel").value; if (!v.startsWith("u:")) return;
@@ -400,7 +413,7 @@ $("#abBtn").onclick = () => {
 };
 $("#factoryReset")?.addEventListener("click", async () => {
   if (!confirm("Restore the factory chain (config/chain.yaml)? The current order, blocks and values will be lost (save a preset first if you want to keep them).")) return;
-  try { await api("POST", "/api/reset"); toast("Factory chain restored"); } catch (e) { toast(e.message); }
+  try { await api("POST", "/api/reset"); toast("Factory chain restored"); } catch (e) { toast(e.message, 4000, true); }
 });
 
 // ---------- tabs ----------

@@ -116,7 +116,7 @@ async function addPlugin(p, at) {
     toast(r.error ? `“${r.name}” added, but it did not load: ${r.error}` : `“${r.name}” added to the chain`, r.error ? 5000 : 2500);
     renderStrip(); renderPanel();
     return true;
-  } catch (e) { toast(e.message); return false; }
+  } catch (e) { toast(e.message, 4000, true); return false; }
 }
 
 // ---------- add a block (dialog) ----------
@@ -170,7 +170,7 @@ async function pkgAction(action, pkg) {
       toast(m.missing_libs.length ? `${pkg} installed, but libraries are missing: ${m.missing_libs.join(", ")}` : `${pkg} installed (${m.bundles.length} plugins). Use + in the Chain tab to add them.`, 6000);
     } else toast(`${pkg} removed`);
   } catch (e) {
-    toast(e.message, 6000);
+    toast(e.message, 6000, true);
     if (e.data?.log?.length) showPkgLog(e.data.log, true);
   } finally {
     pkgBusy = false;

@@ -2,25 +2,53 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CT2IEP TX Audio</title>
+<meta name="theme-color" content="#1d2026">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%23f2a541%22/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <header>
   <div class="brand"><span class="call">CT2IEP</span> <span class="sub">TX Audio</span></div>
-  <div class="status"><span id="dot" class="dot"></span><span id="statusText">connecting…</span></div>
-  <nav>
-    <button class="tab active" data-tab="chain">Chain</button>
-    <button class="tab" data-tab="plugins">Plugins</button>
-    <button class="tab" data-tab="card">Card</button>
-  </nav>
+  <div class="chips">
+    <div id="engineChip" class="chip state" title="Audio engine (JACK + mod-host)">CONNECTING</div>
+    <div id="abChip" class="chip warn" hidden title="A/B: every plugin is out of the path">BYPASS</div>
+    <div id="clipChip" class="chip prot" hidden title="Clipping at the card input or at the output to the radio">CLIP</div>
+  </div>
+  <div class="hctl">
+    <button type="button" class="icon-btn" id="btnWake" aria-pressed="false" title="Keep the screen on while this page is open">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 18h4M12 6v4M9.5 8.5 12 6l2.5 2.5"/></svg>
+      <span>Keep screen on</span></button>
+    <button type="button" class="icon-btn" id="btnFull" aria-pressed="false" title="Full screen">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      <span>Full screen</span></button>
+    <nav>
+      <button class="tab active" data-tab="chain">Chain</button>
+      <button class="tab" data-tab="plugins">Plugins</button>
+      <button class="tab" data-tab="card">Card</button>
+    </nav>
+  </div>
 </header>
 
 <main>
   <section id="tab-chain">
-    <div class="toolbar">
+    <div class="card box">
+      <div class="box-head">
+        <strong>Levels</strong><span class="muted">input and output trims · also active with A/B</span>
+      </div>
+      <div id="levels" class="levels" aria-label="Input and output levels"></div>
+    </div>
+
+    <div class="card box" id="chainCard">
+      <div class="box-head">
+        <span id="dot" class="dot"></span><strong>Processing chain</strong><span class="muted" id="chainSub"></span>
+        <span class="box-right" id="statusText">connecting…</span>
+      </div>
+      <div class="toolbar">
       <button id="abBtn" class="ab" title="Takes every plugin out of the path (unloaded: no CPU use) to compare with the original sound">A/B · Bypass all</button>
       <div class="presets">
         <select id="presetSel" aria-label="Preset"><option value="">— preset —</option></select>
@@ -31,22 +59,20 @@
       </div>
     </div>
 
-    <div id="presetInfo" class="note preset-info" hidden></div>
+      <div id="presetInfo" class="note preset-info" hidden></div>
+      <div id="meters" class="meters"></div>
+      <div id="strip" class="strip"></div>
+      <p class="hint">Drag a block by its <span class="kbd">⋮⋮</span> handle to change the order. The ⏻ button switches a block on/off.</p>
+    </div>
 
-    <div id="levels" class="levels" aria-label="Input and output levels"></div>
-
-    <div id="meters" class="meters"></div>
-
-    <div id="strip" class="strip"></div>
-    <p class="hint">Drag a block by its <span class="kbd">⋮⋮</span> handle to change the order. The ⏻ button switches a block on/off.</p>
-
-    <div id="panel" class="panel"></div>
+    <div id="panel" class="card panel"></div>
   </section>
 
   <section id="tab-plugins" hidden>
-    <div class="toolbar">
-      <div><strong>Plugin packages</strong> <span id="libCount" class="muted"></span></div>
-      <button id="pkgRefresh">Refresh</button>
+    <div class="card box">
+    <div class="box-head">
+      <strong>Plugin packages</strong><span id="libCount" class="muted"></span>
+      <span class="box-right"><button id="pkgRefresh">Refresh</button></span>
     </div>
     <p class="note warn">Installing or removing a package restarts the audio engine (about 2 s without audio).
       Do not do it while transmitting. Plugins installed here live in <code>data/lv2</code> and
@@ -61,33 +87,40 @@
       </div>
     </div>
     <details id="pkgLogBox" class="cards" hidden><summary>Log of the last operation</summary><pre id="pkgLog"></pre></details>
+    </div>
 
-    <h3 class="section-title">Installed plugins</h3>
-    <p class="muted small">Every LV2 plugin the engine can load. <strong>Add</strong> inserts it in the chain after the selected block
+    <div class="card box">
+    <div class="box-head"><strong>Installed plugins</strong><span class="muted">every LV2 plugin the engine can load</span></div>
+    <p class="muted small"> <strong>Add</strong> inserts it in the chain after the selected block
       (select a block in the Chain tab first; you can drag it elsewhere afterwards).</p>
     <div id="pluginBrowser" class="lib-browser in-tab"></div>
+    </div>
   </section>
 
   <section id="tab-card" hidden>
-    <h3 class="section-title first">Output · where the processed audio goes</h3>
+    <div class="card box">
+    <div class="box-head"><strong>Output</strong><span class="muted">where the processed audio goes</span></div>
     <div id="outputs" class="outputs"></div>
     <p class="hint">The main card (<span id="mainCard"></span>) is JACK's own device. Any other device is fed
       through a resampling bridge (zita-j2a: its clock is independent, a few ms more latency). You can send to
       several devices at once, e.g. the UA22 and the FTDX-101D USB codec.</p>
+    </div>
 
-    <h3 class="section-title">Mixer</h3>
-    <div class="toolbar">
-      <div class="row">
-        <label for="cardSel"><strong>Card</strong></label>
-        <select id="cardSel"></select>
-      </div>
-      <button id="mixerRefresh">Refresh</button>
+    <div class="card box">
+    <div class="box-head">
+      <strong>Mixer</strong><span class="muted">controls the card's driver exposes</span>
+      <span class="box-right row"><label for="cardSel" class="muted">Card</label><select id="cardSel"></select>
+        <button id="mixerRefresh">Refresh</button></span>
     </div>
     <div id="mixerNote" class="note" hidden></div>
     <div id="mixer" class="mixer"></div>
-    <h3 class="section-title">Detected audio interfaces</h3>
+    </div>
+
+    <div class="card box">
+    <div class="box-head"><strong>Detected audio interfaces</strong><span class="muted">aplay -l / arecord -l</span></div>
     <div id="cardList" class="card-list"></div>
     <details class="cards"><summary>Output of aplay -l / arecord -l</summary><pre id="cardsRaw"></pre></details>
+    </div>
   </section>
 </main>
 
@@ -104,6 +137,7 @@
   </div>
 </div>
 
+<footer class="muted">Engine: JACK + mod-host (LV2 plugins) · Mic: card input · Outputs: Card tab</footer>
 <div id="toast" class="toast" hidden></div>
 <script src="/static/app.js"></script>
 <script src="/static/chain-edit.js"></script>
@@ -111,5 +145,6 @@
 <script src="/static/plugins.js"></script>
 <script src="/static/card.js"></script>
 <script src="/static/levels.js"></script>
+<script src="/static/screen.js"></script>
 </body>
 </html>

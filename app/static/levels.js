@@ -96,4 +96,7 @@ UI.hooks.meters.push(values => {
       e[k].clip.classList.toggle("on", e[k].clipUntil > now);
     }
   }
+  // header chip: clipping at the card input or at the output to the radio
+  const clip = ["in", "out"].some(st => LV.els[st] && LV.els[st][st === "in" ? "pre" : "post"].clipUntil > now);
+  $("#clipChip").hidden = !clip;
 });

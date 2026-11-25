@@ -54,7 +54,7 @@ async function loadMixer() {
     lab.append(el("span", null, c.kind === "enum" ? c.name : `${c.name} · ${c.direction === "capture" ? "input" : "output"}`), v);
     box.append(lab);
     const post = body => api("POST", "/api/mixer", { card: CARD.current, id: c.id, kind: c.kind, direction: c.direction, ...body })
-      .catch(e => toast(e.message));
+      .catch(e => toast(e.message, 4000, true));
     if (c.kind === "enum") {
       const sel = el("select"); sel.setAttribute("aria-label", c.name);
       for (const it of c.items) { const o = el("option", null, it); o.value = it; sel.append(o); }
@@ -123,17 +123,17 @@ async function saveOutputs() {
   const selected = [...document.querySelectorAll("#outputs input:checked")].map(c => ({ card: c.dataset.card, device: +c.dataset.device }));
   if (!selected.length) { toast("Select at least one output"); loadOutputs(); return; }
   try { CARD.outTries = 0; await loadOutputs(await api("POST", "/api/outputs", { selected })); toast("Output changed"); }
-  catch (e) { toast(e.message); loadOutputs(); }
+  catch (e) { toast(e.message, 4000, true); loadOutputs(); }
 }
 
 async function showCardTab() {
   try { await loadCards(); CARD.outTries = 0; await loadOutputs(); await loadMixer(); }
-  catch (e) { toast(e.message); }
+  catch (e) { toast(e.message, 4000, true); }
 }
 $("#cardSel").onchange = () => {
   CARD.current = $("#cardSel").value;
   try { localStorage.setItem("ct2iep.card", CARD.current); } catch (_) { /* no storage */ }
-  loadMixer().catch(e => toast(e.message));
+  loadMixer().catch(e => toast(e.message, 4000, true));
 };
 $("#mixerRefresh").onclick = showCardTab;
 UI.tabs.card = { onShow: showCardTab };

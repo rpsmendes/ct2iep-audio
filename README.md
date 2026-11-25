@@ -149,6 +149,13 @@ the radio. Use a foot switch on the rear PTT socket, VOX, or PTT over CAT/USB
 
 ## 4. Using the UI
 
+The UI follows the same layout and colours as the other ct2iep-* apps
+(ct2iep-amp, ct2iep-station). The header shows the engine state (**ENGINE ON**),
+**BYPASS** while A/B is on and a blinking **CLIP** while the card input or the
+output to the radio clips; *Keep screen on* and *Full screen* work as in
+ct2iep-amp (keep screen on needs HTTPS on Android: open it through
+ct2iep-station, port 7080).
+
 ### Chain
 - **Input trim / Output trim** (top of the tab): fixed gain stages before and
   after the chain (−36 to +12 dB), with peak meters before and after each trim
